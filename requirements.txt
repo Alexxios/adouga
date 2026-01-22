@@ -1,0 +1,13 @@
+mss
+psutil
+matplotlib
+pillow
+
+psutil>=5.9.0
+pynput>=1.7.6
+
+# MacOS specific
+pyobjc-core>=12.1
+pyobjc-framework-AppleScriptKit>=12.1
+pyobjc-framework-Quartz>=12.1
+pyobjc-framework-Cocoa>=12.1
