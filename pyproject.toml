@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "my-project"
+version = "0.1.0"
+description = "Project converted from requirements.txt"
+authors = ["Your Name <you@example.com>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.14"  # Adjust this to match your installed Python version
+
+# --- Common Dependencies ---
+# Using ">=" matches your text file, but usually "^" (caret) is preferred in Poetry
+psutil = ">=5.9.0"
+pynput = ">=1.7.6"
+matplotlib = "*"     # "*" means install the latest available version
+pillow = "*"
+mss = "*"
+
+# --- MacOS Specific (Darwin) ---
+# These will only be installed if the OS is macOS
+pyobjc-core = {version = ">=12.1", platform = "darwin"}
+pyobjc-framework-AppleScriptKit = {version = ">=12.1", platform = "darwin"}
+pyobjc-framework-Quartz = {version = ">=12.1", platform = "darwin"}
+pyobjc-framework-Cocoa = {version = ">=12.1", platform = "darwin"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
