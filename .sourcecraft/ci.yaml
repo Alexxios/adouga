@@ -5,6 +5,9 @@ on:
 workflows:
   autotests:
     runs_on: serverless
+    env:
+      PYNPUT_BACKEND: dummy # Bypass pynput import errors
+      CI: true
     tasks:
       - name: pytest
         cubes:
@@ -13,8 +16,8 @@ workflows:
             script:
               - |
                 set -eo pipefail
-                apt-get update
-                apt-get install -y python3-dev gcc linux-headers-generic
+                apt-get -qq update
+                apt-get -qq install -y python3-dev gcc linux-headers-generic
                 python -m pip install --upgrade pip setuptools wheel
                 if [ -f pyproject.toml ]; then
                   pip install poetry
@@ -32,8 +35,8 @@ workflows:
             script:
               - |
                 set -eo pipefail
-                apt-get update
-                apt-get install -y python3-dev gcc linux-headers-generic
+                apt-get -qq update
+                apt-get -qq install -y python3-dev gcc linux-headers-generic
                 python -m pip install --upgrade pip setuptools wheel
                 if [ -f pyproject.toml ]; then
                   pip install poetry

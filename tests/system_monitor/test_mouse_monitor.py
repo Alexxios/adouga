@@ -1,11 +1,13 @@
+import os
 import time
 
 import pytest
 import unittest.mock
 from pynput.mouse import Controller, Button
 
-from src.system_monitor.mouse_monitor import MouseMonitor
+from system_monitor.mouse_monitor import MouseMonitor
 
+@pytest.mark.skipif('CI' in os.environ, reason="pynput doesn't work properly in CI")
 def test_click():
     controller = Controller()
     controller.position = (0, 0)
@@ -20,6 +22,7 @@ def test_click():
 
     assert {Button.left: [0, 0, False]} == monitor.button_states
 
+@pytest.mark.skipif('CI' in os.environ, reason="pynput doesn't work properly in CI")
 def test_long_press():
     controller = Controller()
     controller.position = (0, 0)
