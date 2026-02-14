@@ -3,8 +3,23 @@ on:
     - workflows: [sample-workflow]
       filter:
         branches: ["master", "main"]
+    - workflows: [autotests]
 
 workflows:
+  autotests:
+    runs_on: serverless
+    tasks:
+      - name: pytest
+        cubes:
+          - name: pytest
+            image: cr.yandex/mirror/library/python:3.14-slim
+            script:
+              - python -m pip install --upgrade pip
+              - if [ -f pyproject.toml ]; then
+              -   pip install poetry
+              -   poetry install
+              -   poetry run pytest tests/
+              - fi
   sample-workflow:
     runs_on: serverless # Experimental mode. For other options, see: https://sourcecraft.dev/portal/docs/ru/sourcecraft/ci-cd-ref/workflows
     tasks:
@@ -14,4 +29,7 @@ workflows:
             image: cr.yandex/mirror/library/python:3.14-slim
             script:
               - python -m pip install --upgrade pip
-              - if [ -f pyproject.toml ]; then pip install poetry && poetry install; fi
+              - if [ -f pyproject.toml ]; then
+              -   pip install poetry
+              -   poetry install
+              - fi

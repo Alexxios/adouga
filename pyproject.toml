@@ -10,6 +10,7 @@ python = "^3.14"  # Adjust this to match your installed Python version
 
 # --- Common Dependencies ---
 # Using ">=" matches your text file, but usually "^" (caret) is preferred in Poetry
+setuptools = "*"
 psutil = ">=5.9.0"
 pynput = ">=1.7.6"
 matplotlib = "*"     # "*" means install the latest available version
