@@ -16,6 +16,8 @@ workflows:
             script:
               - |
                 set -eo pipefail
+                apt-get update
+                apt-get install python3-dev gcc linux-headers-$$(uname -r)
                 python -m pip install --upgrade pip setuptools wheel
                 if [ -f pyproject.toml ]; then
                   pip install evdev-binary poetry
