@@ -17,7 +17,7 @@ workflows:
               - |
                 set -eo pipefail
                 apt-get update
-                apt-get install python3-dev gcc linux-headers-generic
+                apt-get install -y python3-dev gcc linux-headers-generic
                 python -m pip install --upgrade pip setuptools wheel
                 if [ -f pyproject.toml ]; then
                   pip install poetry
