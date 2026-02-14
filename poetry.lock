@@ -134,30 +134,6 @@ files = [
 ]
 
 [[package]]
-name = "evdev-binary"
-version = "1.9.3"
-description = "Bindings to the Linux input handling subsystem"
-optional = false
-python-versions = ">=3.9"
-groups = ["main"]
-files = [
-    {file = "evdev_binary-1.9.3-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:f0ed8723b5382e37c7d6b32ed4e4963205fa4f7a8d6c8d53c70b43e1174b13e7"},
-    {file = "evdev_binary-1.9.3-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:91507a6dd721bb8037f67f0a9bbbc32b7b4e5536324f71818a0e58290197f649"},
-    {file = "evdev_binary-1.9.3-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:2d90c4126398fa6a5f760fec7cee8a42f87fd266e4a37aa9c36b7958c4a1ae7b"},
-    {file = "evdev_binary-1.9.3-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:ed6419bca316890c80deb6bd31b1d04e441b013e826aa3122ffe4528a094c7e3"},
-    {file = "evdev_binary-1.9.3-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:53bda21275627cc28008bd94dc1ba324c3c24debd0a4b779a64242f19697d681"},
-    {file = "evdev_binary-1.9.3-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:4404fc4222c9c6670b91ab07784b9d0ed06b6138079f91216d0e9238fcd89df3"},
-    {file = "evdev_binary-1.9.3-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:ef92f0259d3bd1d9b449a4ea1ff7b747064a98c4c55844e3f1cbe880c2efe25c"},
-    {file = "evdev_binary-1.9.3-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:1eb0166c89d96dfe56187b18155323f655bdfdf2695777df29b33c44e48ffc74"},
-    {file = "evdev_binary-1.9.3-cp314-cp314-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:6c2d609562c8ceb51b10ed08f2d0a2bc910fa77343c6df0a197fe6360202e039"},
-    {file = "evdev_binary-1.9.3-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:25dc29c2b1a771c11b2f12a45ae6f2f6895a6e12f75b1ef37dc0c24355d25293"},
-    {file = "evdev_binary-1.9.3-cp314-cp314t-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:910b24cc6f921b7e134b2d7ab30cf0d1123e2cc2fbef0a94c0f7fbcd911c818c"},
-    {file = "evdev_binary-1.9.3-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:f0487ab54cfcb1972d891249b3874fe1dbbef93bbb9c14def823b89533fbf976"},
-    {file = "evdev_binary-1.9.3-cp39-cp39-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:dfce898dcff3c0b39d2e8706abc3ea367eaa7e671494463697e9b94624330db7"},
-    {file = "evdev_binary-1.9.3-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:00bc3cedb4f366549ff7b470c18b91f0d50390d7b852f8093d6ab2b9442ab7b1"},
-]
-
-[[package]]
 name = "fonttools"
 version = "4.61.1"
 description = "Tools to manipulate font files"
@@ -968,7 +944,25 @@ files = [
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
 ]
 
+[[package]]
+name = "wheel"
+version = "0.46.3"
+description = "Command line tool for manipulating wheel files"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "wheel-0.46.3-py3-none-any.whl", hash = "sha256:4b399d56c9d9338230118d705d9737a2a468ccca63d5e813e2a4fc7815d8bc4d"},
+    {file = "wheel-0.46.3.tar.gz", hash = "sha256:e3e79874b07d776c40bd6033f8ddf76a7dad46a7b8aa1b2787a83083519a1803"},
+]
+
+[package.dependencies]
+packaging = ">=24.0"
+
+[package.extras]
+test = ["pytest (>=6.0.0)", "setuptools (>=77)"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.14"
-content-hash = "09ad305314161e5912b2c26b085b84f48965a7d32befb5c6dd3bd70273118ddc"
+content-hash = "8e6f6ccb5b66492ea58f1b3623d4a6ed54ca65145a48f6a1de04c764ccbc2b09"
