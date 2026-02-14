@@ -17,7 +17,9 @@ workflows:
               - python -m pip install --upgrade pip
               - if [ -f pyproject.toml ]; then
               -   pip install poetry
-              -   poetry install
+              -   echo "Installed poetry"
+              -   poetry -v install
+              -   echo "Installed deps"
               -   poetry run pytest tests/
               - fi
   sample-workflow:
