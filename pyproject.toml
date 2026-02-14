@@ -10,6 +10,7 @@ python = "^3.14"  # Adjust this to match your installed Python version
 
 # --- Common Dependencies ---
 # Using ">=" matches your text file, but usually "^" (caret) is preferred in Poetry
+evdev-binary = "*"
 setuptools = "*"
 pytest = "*"
 psutil = ">=5.9.0"
