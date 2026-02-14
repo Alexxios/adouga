@@ -16,9 +16,9 @@ workflows:
             script:
               - |
                 set -eo pipefail
-                python -m pip install --upgrade pip
+                python -m pip install --upgrade pip setuptools wheel
                 if [ -f pyproject.toml ]; then
-                  pip install poetry
+                  pip install evdev-binary poetry
                   echo "Installed poetry"
                   poetry -v install
                   echo "Installed deps"
