@@ -41,4 +41,5 @@ workflows:
                 if [ -f pyproject.toml ]; then
                   pip install poetry
                   poetry install
+                  poetry run pyinstaller --noconsole --onefile --name "MyAppName" src/main.py
                 fi
