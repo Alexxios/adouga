@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+
+.git
+.gitignore
+.poetry
+.pytest_cache
+.venv
+.env
+
+desktop/
