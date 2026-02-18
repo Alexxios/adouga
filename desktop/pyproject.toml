@@ -19,6 +19,8 @@ matplotlib = "*"     # "*" means install the latest available version
 pillow = "*"
 mss = "*"
 
+fastapi = "*"
+
 # --- MacOS Specific (Darwin) ---
 # These will only be installed if the OS is macOS
 pyobjc-core = {version = ">=12.1", platform = "darwin"}

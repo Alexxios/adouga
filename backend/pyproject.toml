@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "backend-app"
+version = "0.1.0"
+description = "Backend Application"
+authors = ["Your Name <you@example.com>"]
+package-mode = false
+
+
+[tool.poetry.dependencies]
+python = "^3.14"
+common-deps = { path = "../common", develop = true }
+uvicorn = "*"
+fastapi = "*"
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

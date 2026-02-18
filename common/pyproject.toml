@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "common-deps"
+version = "0.1.0"
+description = "Metapackage for shared dependencies"
+authors = ["Your Name <you@example.com>"]
+
+packages = [
+    { include = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.14"  # Adjust this to match your installed Python version
+
+# --- Common Dependencies ---
+# Using ">=" matches your text file, but usually "^" (caret) is preferred in Poetry
+setuptools = "*"
+wheel = "*"
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
