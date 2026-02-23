@@ -3,5 +3,6 @@ __pycache__
 .poetry
 .pytest_cache
 .vscode
+.codeassistant
 docs
 *.code-workspace

@@ -7,14 +7,15 @@ from collections import deque
 # External libraries
 import psutil
 
-from system_monitor import get_active_window_rect, InputMonitor
-from ui import MonitorPage, AIPage
-from utils import take_screenshot
+from src.system_monitor import get_active_window_rect, InputMonitor
+from src.ui import MonitorPage, AIPage
+from src.utils import take_screenshot
+from src.inference import ONNXClassifier
 
 class SystemMonitorApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Active App Observer v3")
+        self.title("Active App Observer v4 - AI Edition")
         self.geometry("1000x800")
 
         # --- Data Stores ---
@@ -23,6 +24,15 @@ class SystemMonitorApp(tk.Tk):
         self.ram_data = deque([0]*self.history_len, maxlen=self.history_len)
         self.input_data = deque([0]*self.history_len, maxlen=self.history_len)
         self.current_image = None
+
+        # --- Initialize ONNX Classifier ---
+        try:
+            print("Loading ONNX model...")
+            self.classifier = ONNXClassifier(use_gpu=True)
+            print("✓ ONNX model loaded successfully")
+        except Exception as e:
+            print(f"Failed to load ONNX model: {e}")
+            self.classifier = None
 
         # --- Start Input Monitor ---
         # Note: On macOS, this triggers "Input Monitoring" permission request
@@ -52,8 +62,8 @@ class SystemMonitorApp(tk.Tk):
             self.frames[fname] = frame
             frame.grid(row=0, column=0, sticky="nsew")
 
-        self.curr_page = "MonitorPage"
-        self.show("MonitorPage")
+        self.curr_page = "AIPage"
+        self.show("AIPage")
 
         # Start Loop - 5 Seconds interval for snappier input updates
         self.update_interval = 5000
@@ -85,6 +95,8 @@ class SystemMonitorApp(tk.Tk):
         # 4. Update UI
         self.frames[self.curr_page].update_view()
         self.after(self.update_interval, self.loop)
+
+
 if __name__ == "__main__":
     app = SystemMonitorApp()
     app.mainloop()
