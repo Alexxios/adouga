@@ -9,14 +9,17 @@ import psutil
 
 from src.system_monitor import get_active_window_rect, InputMonitor
 from src.ui import MonitorPage, AIPage
+from src.ui.theme import ModernTheme
+from src.ui.navbar import ModernNavbar
 from src.utils import take_screenshot
 from src.inference import ONNXClassifier
 
 class SystemMonitorApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Active App Observer v4 - AI Edition")
-        self.geometry("1000x800")
+        self.title("Adouga - Activity Detection & Observation")
+        self.geometry("1200x800")
+        self.configure(bg=ModernTheme.BACKGROUND_DARK)
 
         # --- Data Stores ---
         self.history_len = 30
@@ -43,18 +46,27 @@ class SystemMonitorApp(tk.Tk):
             self.input_monitor = None
 
         # --- UI Setup ---
-        nav = tk.Frame(self, bg="#333", height=50)
-        nav.pack(side=tk.TOP, fill=tk.X)
+        # Create modern navbar
+        pages = [("AIPage", "AI Analysis"), ("MonitorPage", "Live Stats")]
+        self.navbar = ModernNavbar(
+            self,
+            pages=pages,
+            on_page_change=self.show,
+            backend_url="http://0.0.0.0:7999"
+        )
+        self.navbar.pack(side=tk.TOP, fill=tk.X)
 
-        style = {"bg": "#555", "fg": "white", "bd": 0, "font": ("Arial", 11), "padx": 15, "pady": 8}
-        tk.Button(nav, text="Live Stats", command=lambda: self.show("MonitorPage"), **style).pack(side=tk.LEFT, padx=5, pady=5)
-        tk.Button(nav, text="AI Analysis", command=lambda: self.show("AIPage"), **style).pack(side=tk.LEFT, padx=5, pady=5)
+        # Separator line below navbar
+        separator = tk.Frame(self, bg=ModernTheme.BORDER, height=1)
+        separator.pack(side=tk.TOP, fill=tk.X)
 
-        self.container = tk.Frame(self)
+        # Main container for pages
+        self.container = tk.Frame(self, bg=ModernTheme.BACKGROUND_DARK)
         self.container.pack(fill=tk.BOTH, expand=True)
         self.container.grid_rowconfigure(0, weight=1)
         self.container.grid_columnconfigure(0, weight=1)
 
+        # Initialize pages
         self.frames = {}
         for F in (MonitorPage, AIPage):
             fname = F.__name__
@@ -70,7 +82,11 @@ class SystemMonitorApp(tk.Tk):
         self.after(2000, self.loop)
 
     def show(self, name):
+        """Switch to a different page."""
         self.curr_page = name
+        self.navbar.set_active_page(name)
+
+        # Show the page
         f = self.frames[name]
         f.tkraise()
         f.update_view()
@@ -79,8 +95,8 @@ class SystemMonitorApp(tk.Tk):
         # 1. Capture Stats
         cpu = psutil.cpu_percent()
         ram = psutil.virtual_memory().percent
-        self.cpu_data.append(cpu)
-        self.ram_data.append(ram)
+        self.cpu_data.append(float(cpu))
+        self.ram_data.append(float(ram))
 
         # 2. Capture Inputs (Atomic get and reset)
         input_count = 0

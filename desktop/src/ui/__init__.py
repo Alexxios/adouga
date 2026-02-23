@@ -9,45 +9,86 @@ from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+from .theme import ModernTheme
+from .network_indicator import NetworkIndicator
+
 
 class MonitorPage(tk.Frame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
+        tk.Frame.__init__(self, parent, bg=ModernTheme.BACKGROUND_DARK)
         self.controller = controller
 
+        # Main content area (no header)
+        content = tk.Frame(self, bg=ModernTheme.BACKGROUND_DARK)
+        content.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
         # Left: Image
-        self.left_frame = tk.Frame(self, bg="#222", width=500)
-        self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.left_frame = tk.Frame(content, bg=ModernTheme.BACKGROUND_MEDIUM, width=500)
+        self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         self.left_frame.pack_propagate(False)
-        self.img_label = tk.Label(self.left_frame, text="Waiting...", bg="#222", fg="#888")
+
+        # Image title
+        tk.Label(
+            self.left_frame,
+            text="Active Window Screenshot",
+            bg=ModernTheme.BACKGROUND_MEDIUM,
+            fg=ModernTheme.TEXT_PRIMARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_MEDIUM, "bold")
+        ).pack(pady=(10, 5))
+
+        self.img_label = tk.Label(
+            self.left_frame,
+            text="Waiting for screenshot...",
+            bg=ModernTheme.BACKGROUND_MEDIUM,
+            fg=ModernTheme.TEXT_SECONDARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_NORMAL)
+        )
         self.img_label.pack(expand=True)
 
         # Right: Graphs
-        self.right_frame = tk.Frame(self, bg="white", width=400)
+        self.right_frame = tk.Frame(content, bg=ModernTheme.SURFACE, width=400)
         self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False)
 
-        # We increase the figure size for 3 graphs
-        self.fig = Figure(figsize=(4, 6), dpi=100)
+        # Graph title
+        tk.Label(
+            self.right_frame,
+            text="System Metrics",
+            bg=ModernTheme.SURFACE,
+            fg=ModernTheme.TEXT_PRIMARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_MEDIUM, "bold")
+        ).pack(pady=(10, 5))
+
+        # Configure matplotlib for crisp text rendering
+        self.fig = Figure(figsize=(4, 6), dpi=120, facecolor=ModernTheme.SURFACE)
 
         self.ax_cpu = self.fig.add_subplot(311)
-        self.ax_cpu.set_title("CPU %")
+        self.ax_cpu.set_title("CPU Usage (%)", color=ModernTheme.TEXT_PRIMARY, fontsize=11, fontweight='bold')
         self.ax_cpu.set_ylim(0, 100)
-        self.line_cpu, = self.ax_cpu.plot([], [], 'r-', lw=2)
+        self.ax_cpu.set_facecolor(ModernTheme.BACKGROUND_MEDIUM)
+        self.ax_cpu.tick_params(colors=ModernTheme.TEXT_SECONDARY, labelsize=9)
+        self.ax_cpu.grid(True, alpha=0.2, color=ModernTheme.BORDER)
+        self.line_cpu, = self.ax_cpu.plot([], [], color=ModernTheme.ERROR, lw=2, antialiased=True)
 
         self.ax_ram = self.fig.add_subplot(312)
-        self.ax_ram.set_title("RAM %")
+        self.ax_ram.set_title("RAM Usage (%)", color=ModernTheme.TEXT_PRIMARY, fontsize=11, fontweight='bold')
         self.ax_ram.set_ylim(0, 100)
-        self.line_ram, = self.ax_ram.plot([], [], 'b-', lw=2)
+        self.ax_ram.set_facecolor(ModernTheme.BACKGROUND_MEDIUM)
+        self.ax_ram.tick_params(colors=ModernTheme.TEXT_SECONDARY, labelsize=9)
+        self.ax_ram.grid(True, alpha=0.2, color=ModernTheme.BORDER)
+        self.line_ram, = self.ax_ram.plot([], [], color=ModernTheme.PRIMARY, lw=2, antialiased=True)
 
         self.ax_inp = self.fig.add_subplot(313)
-        self.ax_inp.set_title("Activity (Inputs/10s)")
-        self.ax_inp.set_ylim(0, 300) # Scale for inputs
-        self.line_inp, = self.ax_inp.plot([], [], 'g-', lw=2)
+        self.ax_inp.set_title("User Activity (Inputs/5s)", color=ModernTheme.TEXT_PRIMARY, fontsize=11, fontweight='bold')
+        self.ax_inp.set_ylim(0, 300)
+        self.ax_inp.set_facecolor(ModernTheme.BACKGROUND_MEDIUM)
+        self.ax_inp.tick_params(colors=ModernTheme.TEXT_SECONDARY, labelsize=9)
+        self.ax_inp.grid(True, alpha=0.2, color=ModernTheme.BORDER)
+        self.line_inp, = self.ax_inp.plot([], [], color=ModernTheme.SUCCESS, lw=2, antialiased=True)
 
         self.fig.tight_layout(pad=2.0)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.right_frame)
         self.canvas.draw()
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
     def update_view(self):
         # 1. Update Image
@@ -66,7 +107,7 @@ class MonitorPage(tk.Frame):
                     new_h = int(new_w / img_ratio)
                 img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
                 tk_img = ImageTk.PhotoImage(img_resized)
-                self.img_label.config(image=tk_img)
+                self.img_label.config(image=tk_img, text="")
                 self.img_label.image = tk_img
 
         # 2. Update Graphs
@@ -94,58 +135,58 @@ class AIPage(tk.Frame):
     """AI prediction page showing screenshot and classification results."""
 
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
+        tk.Frame.__init__(self, parent, bg=ModernTheme.BACKGROUND_DARK)
         self.controller = controller
         self.last_prediction = None
 
-        # Main container with two sections
-        main_container = tk.Frame(self, bg="#1a1a1a")
+        # Main container with two sections (no header)
+        main_container = tk.Frame(self, bg=ModernTheme.BACKGROUND_DARK)
         main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Left: Screenshot display
-        self.left_frame = tk.Frame(main_container, bg="#222", width=600)
+        self.left_frame = tk.Frame(main_container, bg=ModernTheme.BACKGROUND_MEDIUM, width=600)
         self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
         # Screenshot title
         tk.Label(
             self.left_frame,
             text="Foreground Application Screenshot",
-            bg="#222",
-            fg="white",
-            font=("Arial", 14, "bold")
+            bg=ModernTheme.BACKGROUND_MEDIUM,
+            fg=ModernTheme.TEXT_PRIMARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_MEDIUM, "bold")
         ).pack(pady=(10, 5))
 
         # Screenshot display
         self.img_label = tk.Label(
             self.left_frame,
             text="Waiting for screenshot...",
-            bg="#222",
-            fg="#888",
-            font=("Arial", 12)
+            bg=ModernTheme.BACKGROUND_MEDIUM,
+            fg=ModernTheme.TEXT_SECONDARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_NORMAL)
         )
         self.img_label.pack(expand=True, pady=10)
 
         # Right: Prediction results
-        self.right_frame = tk.Frame(main_container, bg="#2a2a2a", width=400)
+        self.right_frame = tk.Frame(main_container, bg=ModernTheme.SURFACE, width=400)
         self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False)
         self.right_frame.pack_propagate(False)
 
         # Results title
         tk.Label(
             self.right_frame,
-            text="AI Prediction Results",
-            bg="#2a2a2a",
-            fg="white",
-            font=("Arial", 16, "bold")
+            text="Prediction Results",
+            bg=ModernTheme.SURFACE,
+            fg=ModernTheme.TEXT_PRIMARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_XLARGE, "bold")
         ).pack(pady=(20, 10))
 
         # Prediction class label
         self.class_label = tk.Label(
             self.right_frame,
             text="Class: -",
-            bg="#2a2a2a",
-            fg="#00ff00",
-            font=("Arial", 20, "bold"),
+            bg=ModernTheme.SURFACE,
+            fg=ModernTheme.SUCCESS,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_TITLE, "bold"),
             wraplength=350
         )
         self.class_label.pack(pady=10)
@@ -154,35 +195,35 @@ class AIPage(tk.Frame):
         self.confidence_label = tk.Label(
             self.right_frame,
             text="Confidence: -",
-            bg="#2a2a2a",
-            fg="white",
-            font=("Arial", 14)
+            bg=ModernTheme.SURFACE,
+            fg=ModernTheme.TEXT_PRIMARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_MEDIUM)
         )
         self.confidence_label.pack(pady=5)
 
         # Separator
-        tk.Frame(self.right_frame, bg="#444", height=2).pack(fill=tk.X, pady=20, padx=20)
+        tk.Frame(self.right_frame, bg=ModernTheme.BORDER, height=1).pack(fill=tk.X, pady=20, padx=20)
 
         # Detailed probabilities title
         tk.Label(
             self.right_frame,
             text="Class Probabilities:",
-            bg="#2a2a2a",
-            fg="white",
-            font=("Arial", 12, "bold")
+            bg=ModernTheme.SURFACE,
+            fg=ModernTheme.TEXT_PRIMARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_NORMAL, "bold")
         ).pack(pady=(10, 5))
 
         # Probabilities frame
-        self.prob_frame = tk.Frame(self.right_frame, bg="#2a2a2a")
+        self.prob_frame = tk.Frame(self.right_frame, bg=ModernTheme.SURFACE)
         self.prob_frame.pack(pady=5, padx=20, fill=tk.X)
 
         # Provider info
         self.provider_label = tk.Label(
             self.right_frame,
             text="Provider: -",
-            bg="#2a2a2a",
-            fg="#888",
-            font=("Arial", 9)
+            bg=ModernTheme.SURFACE,
+            fg=ModernTheme.TEXT_SECONDARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_SMALL)
         )
         self.provider_label.pack(side=tk.BOTTOM, pady=10)
 
@@ -190,9 +231,9 @@ class AIPage(tk.Frame):
         self.status_label = tk.Label(
             self.right_frame,
             text="Status: Initializing...",
-            bg="#2a2a2a",
-            fg="#ffaa00",
-            font=("Arial", 10)
+            bg=ModernTheme.SURFACE,
+            fg=ModernTheme.WARNING,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_NORMAL)
         )
         self.status_label.pack(side=tk.BOTTOM, pady=5)
 
@@ -227,7 +268,7 @@ class AIPage(tk.Frame):
                 if not hasattr(self.controller, 'classifier'):
                     self.status_label.config(
                         text="Status: Model not loaded",
-                        fg="#ff0000"
+                        fg=ModernTheme.ERROR
                     )
                     return
 
@@ -240,7 +281,7 @@ class AIPage(tk.Frame):
                 confidence = prediction['confidence']
 
                 # Color code based on class
-                class_color = "#00ff00" if pred_class == "Gaming" else "#ffaa00"
+                class_color = ModernTheme.SUCCESS if pred_class == "Gaming" else ModernTheme.WARNING
 
                 self.class_label.config(
                     text=f"Class: {pred_class}",
@@ -261,13 +302,13 @@ class AIPage(tk.Frame):
 
                 self.status_label.config(
                     text="Status: Ready",
-                    fg="#00ff00"
+                    fg=ModernTheme.SUCCESS
                 )
 
             except Exception as e:
                 self.status_label.config(
                     text=f"Status: Error - {str(e)}",
-                    fg="#ff0000"
+                    fg=ModernTheme.ERROR
                 )
                 print(f"Prediction error: {e}")
         else:
@@ -286,15 +327,15 @@ class AIPage(tk.Frame):
         # Create probability bars for each class
         for class_name, prob in probabilities.items():
             # Class name and percentage
-            label_frame = tk.Frame(self.prob_frame, bg="#2a2a2a")
+            label_frame = tk.Frame(self.prob_frame, bg=ModernTheme.SURFACE)
             label_frame.pack(fill=tk.X, pady=3)
 
             tk.Label(
                 label_frame,
                 text=f"{class_name}:",
-                bg="#2a2a2a",
-                fg="white",
-                font=("Arial", 10),
+                bg=ModernTheme.SURFACE,
+                fg=ModernTheme.TEXT_PRIMARY,
+                font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_NORMAL),
                 width=15,
                 anchor="w"
             ).pack(side=tk.LEFT)
@@ -302,23 +343,25 @@ class AIPage(tk.Frame):
             tk.Label(
                 label_frame,
                 text=f"{prob:.1%}",
-                bg="#2a2a2a",
-                fg="white",
-                font=("Arial", 10, "bold"),
+                bg=ModernTheme.SURFACE,
+                fg=ModernTheme.TEXT_PRIMARY,
+                font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_NORMAL, "bold"),
                 width=8,
                 anchor="e"
             ).pack(side=tk.RIGHT)
 
-            # Progress bar
-            bar_frame = tk.Frame(self.prob_frame, bg="#444", height=20)
-            bar_frame.pack(fill=tk.X, pady=(0, 8))
+            # Progress bar background
+            bar_bg = tk.Frame(self.prob_frame, bg=ModernTheme.BACKGROUND_LIGHT, height=20)
+            bar_bg.pack(fill=tk.X, pady=(0, 8))
 
+            # Progress bar fill
             bar_width = int(prob * 350)  # Max width 350px
-            bar_color = "#00ff00" if class_name == "Gaming" else "#ffaa00"
+            bar_color = ModernTheme.SUCCESS if class_name == "Gaming" else ModernTheme.PRIMARY
 
-            tk.Frame(
-                bar_frame,
-                bg=bar_color,
-                width=bar_width,
-                height=20
-            ).pack(side=tk.LEFT)
+            if bar_width > 0:
+                tk.Frame(
+                    bar_bg,
+                    bg=bar_color,
+                    width=bar_width,
+                    height=20
+                ).pack(side=tk.LEFT)
