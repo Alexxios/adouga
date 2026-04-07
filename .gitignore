@@ -2,6 +2,7 @@ __pycache__
 .DS_Store
 .env
 .claude
+.claudeignore
 .codeassistant
 .poetry
 .pytest_cache
