@@ -29,6 +29,7 @@ pyobjc-framework-Quartz = {version = ">=12.1", platform = "darwin"}
 pyobjc-framework-Cocoa = {version = ">=12.1", platform = "darwin"}
 
 # Data collection / upload
+requests = "*"
 yadisk = "*"
 python-dotenv = "*"
 
