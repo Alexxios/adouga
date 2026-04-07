@@ -5,7 +5,7 @@ import pytest
 import unittest.mock
 from pynput.mouse import Controller, Button
 
-from system_monitor.mouse_monitor import MouseMonitor
+from src.system_monitor.mouse_monitor import MouseMonitor
 
 @pytest.mark.skipif('CI' in os.environ, reason="pynput doesn't work properly in CI")
 def test_click():

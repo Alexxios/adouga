@@ -1,6 +1,7 @@
 __pycache__
 *.pyc
 
+.claude
 .git
 .gitignore
 .poetry

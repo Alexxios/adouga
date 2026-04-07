@@ -28,6 +28,10 @@ pyobjc-core = {version = ">=12.1", platform = "darwin"}
 pyobjc-framework-Quartz = {version = ">=12.1", platform = "darwin"}
 pyobjc-framework-Cocoa = {version = ">=12.1", platform = "darwin"}
 
+# Data collection / upload
+yadisk = "*"
+python-dotenv = "*"
+
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 pytest-mock = "^3.12.0"

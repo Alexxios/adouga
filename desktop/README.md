@@ -103,10 +103,58 @@ The inference module automatically selects the best available execution provider
 
 #### Running Tests
 
+All tests run through Poetry to ensure the correct virtual environment is used.
+
 ```bash
 cd desktop
+
+# Run all tests
 poetry run pytest
+
+# Verbose output with short tracebacks
+poetry run pytest -v --tb=short
+
+# Run a single file
+poetry run pytest tests/test_recorder.py
+
+# Filter by test name substring
+poetry run pytest -k "upload"
+
+# Stop on first failure
+poetry run pytest -x
 ```
+
+Tests are written in **pure pytest style** (flat functions, no unittest classes).
+The test suite is split into:
+- **Unit tests** — all external I/O mocked, run instantly offline
+- **Integration tests** — marked with `skipif` guards; require real OS resources
+  or environment variables (e.g. `YADISK_TOKEN`) to run
+
+#### Dev Mode
+
+To collect ML training data, run the dev entry point:
+
+```bash
+# Basic usage (saves locally, no upload)
+poetry run python src/dev_main.py --no-upload
+
+# With Yandex Disk upload (requires .env with YADISK_TOKEN)
+cp .env.example .env          # fill in your token
+poetry run python src/dev_main.py
+
+# Custom states and window
+poetry run python src/dev_main.py --states "Idle" "Gaming" "Browsing" --window 300
+
+# See all options
+poetry run python src/dev_main.py --help
+```
+
+Global hotkeys (work even when the window is not focused):
+
+| Hotkey | Action |
+|--------|--------|
+| `Ctrl+Shift+R` | Toggle recording on/off |
+| `Ctrl+Shift+N` | Advance to next classification state |
 
 #### Code Structure
 

@@ -1,8 +1,10 @@
 __pycache__
 .DS_Store
+.env
+.claude
+.codeassistant
 .poetry
 .pytest_cache
 .vscode
-.codeassistant
 docs
 *.code-workspace

@@ -1023,6 +1023,21 @@ files = [
 six = ">=1.5"
 
 [[package]]
+name = "python-dotenv"
+version = "1.2.2"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "python_dotenv-1.2.2-py3-none-any.whl", hash = "sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a"},
+    {file = "python_dotenv-1.2.2.tar.gz", hash = "sha256:2c371a91fbd7ba082c2c1dc1f8bf89ca22564a087c2c287cd9b662adde799cf3"},
+]
+
+[package.extras]
+cli = ["click (>=5.0)"]
+
+[[package]]
 name = "python-xlib"
 version = "0.33"
 description = "Python X Library"
@@ -1069,7 +1084,28 @@ mpmath = ">=1.1.0,<1.4"
 [package.extras]
 dev = ["hypothesis (>=6.70.0)", "pytest (>=7.1.0)"]
 
+[[package]]
+name = "yadisk"
+version = "3.4.0"
+description = "Библиотека-клиент REST API Яндекс.Диска / Yandex.Disk REST API client library"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "yadisk-3.4.0-py3-none-any.whl", hash = "sha256:c32d64a3b62812d6ed68ef7a7aefb9404d9b6d8ba923abe2406e0d45aff717c9"},
+    {file = "yadisk-3.4.0.tar.gz", hash = "sha256:6a0a79fb77fe248813f6378fedb17966165950c30cc278ceb660b04d75a9f965"},
+]
+
+[package.extras]
+aiohttp = ["aiohttp"]
+async-defaults = ["aiofiles", "httpx"]
+async-files = ["aiofiles"]
+httpx = ["httpx"]
+pycurl = ["pycurl"]
+requests = ["requests"]
+sync-defaults = ["requests"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14, <3.15"
-content-hash = "510adc020293636c9757ebe9aa4dd3f6f4c492894bdd63bff20d343311a0d36b"
+content-hash = "74dae00d0676df703c112a202f107c9629b9c3f17e0138279703c6bbd892f414"

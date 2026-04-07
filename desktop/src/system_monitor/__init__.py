@@ -1,6 +1,7 @@
 import platform
 import psutil
 import threading
+from collections import deque
 from pynput import keyboard, mouse
 
 def get_active_processes(pids=[]):
@@ -108,14 +109,23 @@ def _get_macos_rect_native():
 # ==========================================
 # 2. INPUT MONITOR (Threaded)
 # ==========================================
+_FLICK_MIN_MAG = 10   # pixels — minimum movement magnitude to count as a flick
+_FLICK_BUFFER = 300   # how many flicks to retain
+
 class InputMonitor:
     def __init__(self):
         self.counter = 0
         self._lock = threading.Lock()
+        self._flicks = deque(maxlen=_FLICK_BUFFER)
+        self._last_pos = None
 
         # Start Listeners (Non-blocking)
         self.kb_listener = keyboard.Listener(on_press=self._on_event)
-        self.mouse_listener = mouse.Listener(on_click=self._on_event, on_scroll=self._on_event)
+        self.mouse_listener = mouse.Listener(
+            on_click=self._on_event,
+            on_scroll=self._on_event,
+            on_move=self._on_move,
+        )
 
         self.kb_listener.start()
         self.mouse_listener.start()
@@ -125,9 +135,28 @@ class InputMonitor:
         with self._lock:
             self.counter += 1
 
+    def _on_move(self, x, y):
+        if self._last_pos is not None:
+            dx = x - self._last_pos[0]
+            dy = y - self._last_pos[1]
+            if dx * dx + dy * dy >= _FLICK_MIN_MAG ** 2:
+                with self._lock:
+                    self._flicks.append((dx, dy))
+        self._last_pos = (x, y)
+
     def get_and_reset_count(self):
         """Returns the number of events since last check and resets to 0"""
         with self._lock:
             count = self.counter
             self.counter = 0
         return count
+
+    def get_flicks(self):
+        """Returns a snapshot of recent flick vectors as a list of (dx, dy)."""
+        with self._lock:
+            return list(self._flicks)
+
+    def stop(self):
+        """Stop both pynput listeners."""
+        self.kb_listener.stop()
+        self.mouse_listener.stop()

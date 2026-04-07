@@ -8,7 +8,7 @@ from collections import deque
 import psutil
 
 from src.system_monitor import get_active_window_rect, InputMonitor
-from src.ui import MonitorPage, AIPage
+from src.ui import MonitorPage, AIPage, FlicksPage
 from src.ui.theme import ModernTheme
 from src.ui.navbar import ModernNavbar
 from src.utils import take_screenshot
@@ -47,7 +47,7 @@ class SystemMonitorApp(tk.Tk):
 
         # --- UI Setup ---
         # Create modern navbar
-        pages = [("AIPage", "AI Analysis"), ("MonitorPage", "Live Stats")]
+        pages = [("AIPage", "AI Analysis"), ("MonitorPage", "Live Stats"), ("FlicksPage", "Mouse Flicks")]
         self.navbar = ModernNavbar(
             self,
             pages=pages,
@@ -68,7 +68,7 @@ class SystemMonitorApp(tk.Tk):
 
         # Initialize pages
         self.frames = {}
-        for F in (MonitorPage, AIPage):
+        for F in (MonitorPage, AIPage, FlicksPage):
             fname = F.__name__
             frame = F(self.container, self)
             self.frames[fname] = frame
