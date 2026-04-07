@@ -25,7 +25,7 @@ from threading import Thread
 from src.dev.hotkeys import HotkeyManager
 from src.dev.recorder import DataRecorder
 from src.dev.uploader import YaDiskUploader
-from src.system_monitor import InputMonitor
+from src.system_monitor import HardwareMonitor, InputMonitor
 from src.ui.dev_page import DevPage
 from src.ui.theme import ModernTheme as T
 
@@ -121,9 +121,19 @@ class DevApp(tk.Tk):
             logger.exception("Failed to start InputMonitor")
             self._input_monitor = None
 
+        # ---- Hardware monitor ----
+        try:
+            self._hw_monitor = HardwareMonitor()
+            self._hw_monitor.start()
+            logger.info("HardwareMonitor started")
+        except Exception:
+            logger.exception("Failed to start HardwareMonitor")
+            self._hw_monitor = None
+
         # ---- Recorder ----
         self._recorder = DataRecorder(
             input_monitor=self._input_monitor,
+            hardware_monitor=self._hw_monitor,
             window_seconds=args.window,
             sample_interval=args.interval,
         )
@@ -260,6 +270,11 @@ class DevApp(tk.Tk):
         logger.info("Closing DevApp")
         self._recorder.stop()
         self._hotkeys.stop()
+        if self._hw_monitor is not None:
+            try:
+                self._hw_monitor.stop()
+            except Exception:
+                logger.warning("HardwareMonitor.stop() raised", exc_info=True)
         if self._input_monitor is not None:
             try:
                 self._input_monitor.stop()

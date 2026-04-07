@@ -1,22 +1,27 @@
 """Rolling-buffer data recorder for ML training data collection.
 
-Captures screenshots, device stats, and input metrics at a fixed interval,
-retaining the last ``window_seconds`` of samples.  Call :meth:`export_zip`
-to package the current buffer as a labelled ZIP archive ready for upload.
+Captures screenshots and input metrics at a fixed interval, retaining the
+last ``window_seconds`` of samples.  Hardware stats (CPU, RAM, GPU, disk) are
+provided as rolling time-series by :class:`HardwareMonitor` and attached to
+each sample as-is, giving every training example its full 3-minute context.
 
-Per-sample stats
-----------------
-* CPU %                 — ``psutil.cpu_percent``
-* RAM %                 — ``psutil.virtual_memory``
-* GPU load / memory     — via GPUtil (NVIDIA); ``None`` if unavailable
-* Disk I/O (bytes/sec)  — delta of ``psutil.disk_io_counters`` between samples
-* Input event count     — keyboard + mouse clicks/scrolls since last sample
-* Flick vectors         — significant mouse-movement vectors (InputMonitor)
-* Input sequence        — timestamped raw event log for the last 3 min
-* Key heatmaps          — per-key frequency dicts for 1s/5s/15s/30s/1m/3m windows
-* Screenshot            — PIL image of the active window
+Call :meth:`export_zip` to package the current buffer as a labelled ZIP
+archive ready for upload.
+
+Per-sample contents
+-------------------
+* ``cpu_history``      — [{timestamp, percent, freq_ghz}, ...]
+* ``ram_history``      — [{timestamp, percent, used_gb, total_gb}, ...]
+* ``gpu_history``      — [{timestamp, load_percent, memory_used_gb, ...}, ...]
+* ``disk_history``     — [{timestamp, read_bps, write_bps}, ...]
+* ``input_count``      — keyboard + mouse events since the last sample
+* ``flick_vectors``    — significant mouse-movement vectors
+* ``input_sequence``   — timestamped raw event log (last 3 min)
+* ``key_heatmaps``     — per-key frequency dicts for 1s/5s/15s/30s/1m/3m windows
+* ``screenshot``       — PIL image of the active window (excluded from JSON)
 """
 
+import dataclasses
 import io
 import json
 import logging
@@ -29,43 +34,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-import psutil
-
 from src.system_monitor import get_active_window_rect
 from src.utils import take_screenshot
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_WINDOW_SECONDS = 180   # 3 minutes
-_DEFAULT_SAMPLE_INTERVAL = 5    # seconds between captures
-
-
-# ---------------------------------------------------------------------------
-# GPU helper (optional — requires GPUtil / NVIDIA drivers)
-# ---------------------------------------------------------------------------
-
-def _get_gpu_stats() -> Optional[dict]:
-    """Return basic GPU stats for the first detected NVIDIA GPU, or ``None``."""
-    try:
-        import GPUtil  # type: ignore[import]
-        gpus = GPUtil.getGPUs()
-        if gpus:
-            g = gpus[0]
-            stats = {
-                "name": g.name,
-                "load_percent": round(g.load * 100, 1),
-                "memory_used_mb": round(g.memoryUsed, 1),
-                "memory_total_mb": round(g.memoryTotal, 1),
-                "memory_percent": round(g.memoryUtil * 100, 1),
-                "temperature_c": g.temperature,
-            }
-            logger.debug("GPU stats: %s", stats)
-            return stats
-    except ImportError:
-        logger.debug("GPUtil not installed — GPU stats unavailable")
-    except Exception:
-        logger.debug("GPUtil query failed", exc_info=True)
-    return None
+_DEFAULT_WINDOW_SECONDS = 180
+_DEFAULT_SAMPLE_INTERVAL = 5
 
 
 # ---------------------------------------------------------------------------
@@ -79,32 +54,32 @@ class DataSample:
     timestamp: float
     label: str
 
-    # System stats
-    cpu_percent: float
-    ram_percent: float
-    gpu_stats: Optional[dict]           # None when GPU unavailable
-    disk_io: Optional[dict]             # {"read_bps": float, "write_bps": float}
+    # Hardware histories — rolling 3-min time series from HardwareMonitor
+    cpu_history: list   # [{"timestamp", "percent", "freq_ghz"}, ...]
+    ram_history: list   # [{"timestamp", "percent", "used_gb", "total_gb"}, ...]
+    gpu_history: list   # [{"timestamp", "load_percent", "memory_used_gb", ...}, ...]
+    disk_history: list  # [{"timestamp", "read_bps", "write_bps"}, ...]
 
     # Input aggregate (since last sample)
     input_count: int
-    flick_vectors: list                 # list[tuple[int, int]]
+    flick_vectors: list  # [(dx, dy), ...]
 
-    # Input detail (rolling 3-min window)
-    input_sequence: list                # list[{"timestamp", "type", "value"}]
-    key_heatmaps: dict                  # {"1s": {key: count}, "5s": ..., ...}
+    # Input detail — rolling 3-min window
+    input_sequence: list  # [{"timestamp", "type", "value"}, ...]
+    key_heatmaps: dict    # {"1s": {key: count}, "5s": ..., ...}
 
-    # Visual
-    screenshot: Optional[object] = field(default=None, repr=False)  # PIL.Image | None
+    # Visual (excluded from JSON export)
+    screenshot: Optional[object] = field(default=None, repr=False)
 
     def to_dict(self) -> dict:
         """JSON-serialisable representation (screenshot excluded)."""
         return {
             "timestamp": self.timestamp,
             "label": self.label,
-            "cpu_percent": self.cpu_percent,
-            "ram_percent": self.ram_percent,
-            "gpu_stats": self.gpu_stats,
-            "disk_io": self.disk_io,
+            "cpu_history": self.cpu_history,
+            "ram_history": self.ram_history,
+            "gpu_history": self.gpu_history,
+            "disk_history": self.disk_history,
             "input_count": self.input_count,
             "flick_vectors": self.flick_vectors,
             "input_sequence": self.input_sequence,
@@ -122,22 +97,26 @@ class DataRecorder:
     Parameters
     ----------
     input_monitor:
-        An :class:`src.system_monitor.InputMonitor` instance (or any object
-        exposing ``get_and_reset_count``, ``get_flicks``,
-        ``get_input_sequence``, and ``get_key_heatmaps``).
+        Object exposing ``get_and_reset_count``, ``get_flicks``,
+        ``get_input_sequence``, ``get_key_heatmaps``.
+    hardware_monitor:
+        Optional :class:`src.system_monitor.HardwareMonitor`.  When provided,
+        each sample includes the full CPU/RAM/GPU/disk rolling histories.
     window_seconds:
-        Length of the rolling window in seconds (default 180 = 3 min).
+        Rolling buffer length in seconds (default 180 = 3 min).
     sample_interval:
-        Seconds between consecutive captures (default 5 s).
+        Seconds between captures (default 5 s).
     """
 
     def __init__(
         self,
         input_monitor,
+        hardware_monitor=None,
         window_seconds: int = _DEFAULT_WINDOW_SECONDS,
         sample_interval: int = _DEFAULT_SAMPLE_INTERVAL,
     ) -> None:
         self._input_monitor = input_monitor
+        self._hw = hardware_monitor
         self._window_seconds = window_seconds
         self._sample_interval = sample_interval
         self._max_samples = max(1, window_seconds // sample_interval)
@@ -148,14 +127,10 @@ class DataRecorder:
         self._lock = threading.Lock()
         self._timer: Optional[threading.Timer] = None
 
-        # Disk I/O baseline for delta computation
-        self._last_disk_io = psutil.disk_io_counters()
-
         logger.info(
-            "DataRecorder ready — window=%ds interval=%ds max_samples=%d",
-            window_seconds,
-            sample_interval,
-            self._max_samples,
+            "DataRecorder ready — window=%ds interval=%ds max_samples=%d hw=%s",
+            window_seconds, sample_interval, self._max_samples,
+            type(hardware_monitor).__name__ if hardware_monitor else "none",
         )
 
     # ------------------------------------------------------------------
@@ -218,7 +193,7 @@ class DataRecorder:
     # ------------------------------------------------------------------
 
     def get_samples(self) -> list:
-        """Return a snapshot of the current buffer as a plain list."""
+        """Return a snapshot of the buffer as a plain list."""
         with self._lock:
             return list(self._samples)
 
@@ -232,11 +207,9 @@ class DataRecorder:
         Archive layout::
 
             metadata.json       — session info and label summary
-            samples.jsonl       — one JSON object per line (stats, no screenshots)
+            samples.jsonl       — one JSON object per line (no screenshots)
             screenshots/
                 <timestamp>.png — one PNG per sample that had a screenshot
-
-        The file is created atomically via a temporary sibling file.
         """
         samples = self.get_samples()
         if not samples:
@@ -264,7 +237,6 @@ class DataRecorder:
                     },
                 }
                 zf.writestr("metadata.json", json.dumps(meta, indent=2))
-                logger.debug("Written metadata.json")
 
                 jsonl_lines = [json.dumps(s.to_dict()) for s in samples]
                 zf.writestr("samples.jsonl", "\n".join(jsonl_lines))
@@ -308,37 +280,35 @@ class DataRecorder:
         try:
             timestamp = time.time()
 
-            # --- System stats ---
-            cpu = psutil.cpu_percent(interval=None)
-            ram = psutil.virtual_memory().percent
-            gpu = _get_gpu_stats()
-            disk_io = self._capture_disk_io()
+            # Hardware histories
+            cpu_history  = self._hw.get_cpu_history()  if self._hw else []
+            ram_history  = self._hw.get_ram_history()  if self._hw else []
+            gpu_history  = self._hw.get_gpu_history()  if self._hw else []
+            disk_history = self._hw.get_disk_history() if self._hw else []
 
-            # --- Input ---
-            input_count = self._input_monitor.get_and_reset_count()
-            flicks = self._input_monitor.get_flicks()
-            input_sequence = (
+            # Input
+            input_count     = self._input_monitor.get_and_reset_count()
+            flicks          = self._input_monitor.get_flicks()
+            input_sequence  = (
                 self._input_monitor.get_input_sequence()
-                if hasattr(self._input_monitor, "get_input_sequence")
-                else []
+                if hasattr(self._input_monitor, "get_input_sequence") else []
             )
-            key_heatmaps = (
+            key_heatmaps    = (
                 self._input_monitor.get_key_heatmaps()
-                if hasattr(self._input_monitor, "get_key_heatmaps")
-                else {}
+                if hasattr(self._input_monitor, "get_key_heatmaps") else {}
             )
 
-            # --- Screenshot ---
-            rect = get_active_window_rect()
+            # Screenshot
+            rect       = get_active_window_rect()
             screenshot = take_screenshot(rect) if rect else None
 
             sample = DataSample(
                 timestamp=timestamp,
                 label=self._current_label,
-                cpu_percent=cpu,
-                ram_percent=ram,
-                gpu_stats=gpu,
-                disk_io=disk_io,
+                cpu_history=cpu_history,
+                ram_history=ram_history,
+                gpu_history=gpu_history,
+                disk_history=disk_history,
                 input_count=input_count,
                 flick_vectors=list(flicks),
                 input_sequence=input_sequence,
@@ -350,31 +320,14 @@ class DataRecorder:
                 self._samples.append(sample)
 
             logger.debug(
-                "Sample captured — label=%r cpu=%.1f%% ram=%.1f%% "
-                "gpu=%s disk_io=%s inputs=%d seq_len=%d screenshot=%s",
-                self._current_label, cpu, ram,
-                f"{gpu['load_percent']}%" if gpu else "n/a",
-                f"r={disk_io['read_bps']:.0f} w={disk_io['write_bps']:.0f}" if disk_io else "n/a",
+                "Sample captured — label=%r cpu_pts=%d ram_pts=%d "
+                "gpu_pts=%d disk_pts=%d inputs=%d seq=%d screenshot=%s",
+                self._current_label,
+                len(cpu_history), len(ram_history),
+                len(gpu_history), len(disk_history),
                 input_count, len(input_sequence),
                 "ok" if screenshot else "none",
             )
 
         except Exception:
             logger.exception("Error capturing sample — skipping")
-
-    def _capture_disk_io(self) -> Optional[dict]:
-        """Return read/write bytes-per-second since the last sample."""
-        try:
-            current = psutil.disk_io_counters()
-            if current is None or self._last_disk_io is None:
-                return None
-            dt = self._sample_interval or 1
-            result = {
-                "read_bps": (current.read_bytes - self._last_disk_io.read_bytes) / dt,
-                "write_bps": (current.write_bytes - self._last_disk_io.write_bytes) / dt,
-            }
-            self._last_disk_io = current
-            return result
-        except Exception:
-            logger.debug("disk_io_counters() failed", exc_info=True)
-            return None
