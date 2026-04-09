@@ -41,6 +41,8 @@ workflows:
                 pip install poetry poetry-plugin-export
                 cd desktop
                 poetry export -f requirements.txt -o requirements.txt --without dev
+                # Strip python_version markers so deps install on the action's Python 3.10
+                sed -i 's/ ;.*python_version.*//' requirements.txt
 
           # 2. Build Windows .exe via PyInstaller (Wine-based, cross-compiles on Linux)
           - name: pyinstaller
