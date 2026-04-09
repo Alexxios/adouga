@@ -23,6 +23,7 @@ a = Analysis(
         'matplotlib.backends.backend_tkagg',
         'matplotlib.figure',
         'GPUtil',
+        'setuptools',
         'pkg_resources.extern',
     ],
     hookspath=[],
