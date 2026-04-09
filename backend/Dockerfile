@@ -13,4 +13,7 @@ RUN poetry config virtualenvs.create false
 RUN poetry install -v --no-interaction --no-ansi
 
 COPY backend /project/app/
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY backend/entrypoint.sh /project/app/entrypoint.sh
+RUN chmod +x /project/app/entrypoint.sh
+
+CMD ["bash", "entrypoint.sh"]

@@ -11,8 +11,24 @@ python = "^3.14"
 common-deps = { path = "../common", develop = true }
 uvicorn = "*"
 fastapi = "*"
+sqlalchemy = { version = "^2.0", extras = ["asyncio"] }
+asyncpg = "*"
+alembic = "*"
+pydantic-settings = "*"
+python-jose = { version = "*", extras = ["cryptography"] }
+bcrypt = "*"
+prometheus-fastapi-instrumentator = "*"
+python-multipart = "*"
+psycopg2-binary = "*"
 
+[tool.poetry.group.dev.dependencies]
+pytest-asyncio = "*"
+httpx = "*"
+aiosqlite = "*"
+greenlet = "*"
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [build-system]
 requires = ["poetry-core"]
