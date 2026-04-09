@@ -40,9 +40,11 @@ workflows:
                 set -eo pipefail
                 pip install poetry poetry-plugin-export
                 cd desktop
-                poetry export -f requirements.txt -o requirements.txt --without dev
-                # Strip python_version markers so deps install on the action's Python 3.10
-                sed -i 's/ ;.*python_version.*//' requirements.txt
+                poetry export --without-hashes --without dev -f requirements.txt -o requirements.txt
+                # Poetry locks versions for Python 3.14, but the PyInstaller action
+                # uses 3.10. Strip markers and exact pins so pip can resolve
+                # compatible versions for 3.10.
+                sed -i 's/ *;.*//; s/==[^ ]*//' requirements.txt
 
           # 2. Build Windows .exe via PyInstaller (Wine-based, cross-compiles on Linux)
           - name: pyinstaller
