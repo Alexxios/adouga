@@ -40,7 +40,7 @@ workflows:
                 set -eo pipefail
                 pip install poetry poetry-plugin-export
                 cd desktop
-                poetry export -f requirements.txt -o requirements.txt
+                poetry export --without-hashes --without dev,inference,macos -f requirements.txt -o requirements.txt
 
           # 2. Build Windows .exe via PyInstaller (Wine-based, cross-compiles on Linux)
           - name: pyinstaller
