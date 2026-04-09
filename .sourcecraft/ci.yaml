@@ -48,6 +48,10 @@ workflows:
             with:
               path: desktop
               spec: dev_main.spec
+            artifacts:
+              paths:
+                - ./desktop/dist
+                - ./dist
 
           # 3. Build Windows installer with Inno Setup (Wine-based, runs on Linux)
           - name: innosetup
