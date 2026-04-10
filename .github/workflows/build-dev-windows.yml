@@ -29,4 +29,5 @@ jobs:
           spec: desktop/dev_main.spec
           requirements: desktop/requirements.txt
           python_ver: "3.14"
+          clean_checkout: false
           upload_exe_with_name: AdougaDev-windows
