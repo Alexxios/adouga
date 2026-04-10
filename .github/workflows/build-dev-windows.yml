@@ -1,0 +1,32 @@
+name: Build Dev App (Windows)
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    env:
+      PYNPUT_BACKEND: dummy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Export requirements
+        run: |
+          pip install poetry poetry-plugin-export
+          cd desktop
+          poetry export --without-hashes --without dev,inference,macos -f requirements.txt -o requirements.txt
+
+      - name: Build with PyInstaller
+        uses: sayyid5416/pyinstaller@v1
+        with:
+          spec: desktop/dev_main.spec
+          requirements: desktop/requirements.txt
+          python_ver: "3.14"
+          upload_exe_with_name: AdougaDev-windows
