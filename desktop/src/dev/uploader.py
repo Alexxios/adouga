@@ -46,10 +46,17 @@ class YaDiskUploader:
         self,
         token: Optional[str] = None,
         remote_base: str = _REMOTE_BASE_DIR,
+        tester_id: str = "",
     ) -> None:
         self._token = token if token is not None else _resolve_token()
         self._remote_base = remote_base.rstrip("/")
+        self._tester_id = tester_id
         logger.info("YaDiskUploader initialised — remote base: %s", self._remote_base)
+
+    def set_tester_id(self, tester_id: str) -> None:
+        """Update the tester identifier used for remote path namespacing."""
+        self._tester_id = tester_id
+        logger.info("Tester ID set: %r", tester_id)
 
     # ------------------------------------------------------------------
     # Public API
@@ -82,11 +89,14 @@ class YaDiskUploader:
             Remote path of the uploaded file.
         """
         local_path = Path(local_path)
-        remote_path = f"{self._remote_base}/{local_path.name}"
+        if self._tester_id:
+            remote_path = f"{self._remote_base}/{self._tester_id}/{local_path.name}"
+        else:
+            remote_path = f"{self._remote_base}/{local_path.name}"
         logger.info("Uploading %s → %s", local_path, remote_path)
 
         with yadisk.Client(token=self._token) as client:
-            self._ensure_remote_dir(client)
+            self._ensure_remote_dir(client, remote_path)
             with open(local_path, "rb") as fh:
                 client.upload(fh, remote_path, overwrite=overwrite)
 
@@ -98,9 +108,10 @@ class YaDiskUploader:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _ensure_remote_dir(self, client: yadisk.Client) -> None:
-        """Create *remote_base* (and any missing parents) if absent."""
-        parts = self._remote_base.strip("/").split("/")
+    def _ensure_remote_dir(self, client: yadisk.Client, remote_path: str) -> None:
+        """Create all parent directories for *remote_path* if absent."""
+        dir_path = remote_path.rsplit("/", 1)[0]
+        parts = dir_path.strip("/").split("/")
         for depth in range(1, len(parts) + 1):
             path = "/" + "/".join(parts[:depth])
             try:

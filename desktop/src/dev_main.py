@@ -18,10 +18,9 @@ import argparse
 import logging
 import sys
 import tkinter as tk
-from datetime import datetime, timezone
 from pathlib import Path
-from threading import Thread
 
+from src.dev.batch_uploader import BatchUploader
 from src.dev.hotkeys import HotkeyManager
 from src.dev.recorder import DataRecorder
 from src.dev.uploader import YaDiskUploader
@@ -29,7 +28,7 @@ from src.system_monitor import HardwareMonitor, InputMonitor
 from src.ui.dev_page import DevPage
 from src.ui.theme import ModernTheme as T
 
-_DEFAULT_STATES = ["Not Gaming", "Gaming"]
+_DEFAULT_STATES = ["Idle", "Not Gaming", "Gaming"]
 _DEFAULT_OUTPUT_DIR = Path.home() / "adouga_ml_data"
 
 
@@ -57,10 +56,17 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--interval",
-        type=int,
-        default=5,
+        type=float,
+        default=0.5,
         metavar="SECONDS",
         help="Sample capture interval in seconds",
+    )
+    p.add_argument(
+        "--delay",
+        type=float,
+        default=0.0,
+        metavar="SECONDS",
+        help="Delay in seconds before the first capture after Start",
     )
     p.add_argument(
         "--window",
@@ -136,6 +142,9 @@ class DevApp(tk.Tk):
             hardware_monitor=self._hw_monitor,
             window_seconds=args.window,
             sample_interval=args.interval,
+            first_capture_delay=args.delay,
+            batch_size=10,
+            on_batch_ready=self._on_batch_ready,
         )
 
         # Set initial label from first state
@@ -154,6 +163,13 @@ class DevApp(tk.Tk):
                 logger.warning("Upload unavailable: %s", exc)
                 self._uploader = None
 
+        # ---- Batch uploader ----
+        self._batch_uploader = BatchUploader(
+            uploader=self._uploader,
+            output_dir=self._args.output_dir,
+        )
+        self._batch_uploader.start()
+
         # ---- Hotkey manager ----
         self._hotkeys = HotkeyManager(
             on_toggle_recording=self._toggle_recording,
@@ -168,6 +184,9 @@ class DevApp(tk.Tk):
             on_stop=self._stop_recording,
             on_save=self._save_and_upload,
             on_state_change=self._on_state_change,
+            on_tester_change=self._on_tester_change,
+            on_delay_change=self._on_delay_change,
+            initial_delay=args.delay,
         )
         self._page.pack(fill="both", expand=True)
 
@@ -207,58 +226,51 @@ class DevApp(tk.Tk):
         logger.info("Classification state changed: %r", label)
         self._recorder.current_label = label
 
+    def _on_tester_change(self, tester_id: str) -> None:
+        logger.info("Tester ID set: %r", tester_id)
+        self._batch_uploader.tester_id = tester_id
+        if self._uploader is not None:
+            self._uploader.set_tester_id(tester_id)
+
+    def _on_delay_change(self, delay: float) -> None:
+        logger.info("First-capture delay changed: %.1f", delay)
+        self._recorder.first_capture_delay = delay
+
+    def _on_batch_ready(self, samples: list) -> None:
+        """Called from recorder thread when a batch of samples is ready."""
+        self._batch_uploader.enqueue(samples)
+
     # ------------------------------------------------------------------
     # Save & upload
     # ------------------------------------------------------------------
 
     def _save_and_upload(self) -> None:
-        samples = self._recorder.get_samples()
-        if not samples:
-            logger.warning("Save requested but buffer is empty — nothing to do")
-            self._page.set_upload_status("Buffer is empty — nothing to save", success=False)
-            return
-
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        label_slug = self._recorder.current_label.replace(" ", "_").lower()
-        filename = f"session_{ts}_{label_slug}.zip"
-        out_path = self._args.output_dir / filename
-
-        try:
-            self._recorder.export_zip(out_path)
-        except Exception as exc:
-            logger.exception("Export failed")
-            self._page.set_upload_status(f"Export failed: {exc}", success=False)
-            return
-
-        if self._uploader is not None:
-            self._page.set_upload_status("Uploading…", success=True)
-            Thread(
-                target=self._do_upload,
-                args=(out_path,),
-                name="yadisk-upload",
-                daemon=True,
-            ).start()
+        """Flush any remaining unflushed samples to the upload queue."""
+        remaining = self._recorder.flush_unflushed()
+        if remaining:
+            self._batch_uploader.enqueue(remaining)
+            self._page.set_upload_status(
+                f"Flushed {len(remaining)} samples to upload queue", success=True,
+            )
         else:
-            self._page.set_upload_status(f"Saved locally: {out_path.name}", success=True)
-
-    def _do_upload(self, path: Path) -> None:
-        """Run in a daemon thread — post result back to main thread."""
-        try:
-            remote = self._uploader.upload(path)
-            self.after(0, self._page.set_upload_status, f"Uploaded: {remote}", True)
-        except Exception as exc:
-            logger.exception("Upload failed")
-            self.after(0, self._page.set_upload_status, f"Upload failed: {exc}", False)
+            self._page.set_upload_status("No unflushed samples", success=True)
 
     # ------------------------------------------------------------------
     # UI refresh
     # ------------------------------------------------------------------
 
     def _tick_ui(self) -> None:
-        """Refresh sample counter every second."""
+        """Refresh sample counter and upload stats every second."""
         self._page.update_sample_count(
             self._recorder.sample_count,
             self._recorder.max_samples,
+        )
+        self._page.update_upload_stats(
+            uploaded=self._batch_uploader.batches_uploaded,
+            failed=self._batch_uploader.batches_failed,
+            pending=self._batch_uploader.pending_count,
+            samples_uploaded=self._batch_uploader.samples_uploaded,
+            last_error=self._batch_uploader.last_error,
         )
         self.after(1000, self._tick_ui)
 
@@ -269,6 +281,11 @@ class DevApp(tk.Tk):
     def _on_close(self) -> None:
         logger.info("Closing DevApp")
         self._recorder.stop()
+        # Flush remaining samples before shutting down
+        remaining = self._recorder.flush_unflushed()
+        if remaining:
+            self._batch_uploader.enqueue(remaining)
+        self._batch_uploader.stop()
         self._hotkeys.stop()
         if self._hw_monitor is not None:
             try:

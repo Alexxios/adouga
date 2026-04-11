@@ -114,7 +114,7 @@ def test_ensure_remote_dir_creates_missing():
     uploader = YaDiskUploader(token=_FAKE_TOKEN, remote_base="/adouga/ml_sessions")
     client = MagicMock()
     client.exists.return_value = False
-    uploader._ensure_remote_dir(client)
+    uploader._ensure_remote_dir(client, "/adouga/ml_sessions/file.zip")
     assert client.mkdir.call_count == 2  # /adouga and /adouga/ml_sessions
 
 
@@ -122,7 +122,7 @@ def test_ensure_remote_dir_skips_existing():
     uploader = YaDiskUploader(token=_FAKE_TOKEN, remote_base="/adouga/ml_sessions")
     client = MagicMock()
     client.exists.return_value = True
-    uploader._ensure_remote_dir(client)
+    uploader._ensure_remote_dir(client, "/adouga/ml_sessions/file.zip")
     client.mkdir.assert_not_called()
 
 
@@ -132,7 +132,7 @@ def test_ensure_remote_dir_raises_on_mkdir_failure():
     client.exists.return_value = False
     client.mkdir.side_effect = RuntimeError("quota exceeded")
     with pytest.raises(RuntimeError, match="quota exceeded"):
-        uploader._ensure_remote_dir(client)
+        uploader._ensure_remote_dir(client, "/adouga/ml_sessions/file.zip")
 
 
 # ---------------------------------------------------------------------------

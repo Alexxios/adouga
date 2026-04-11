@@ -32,7 +32,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from src.system_monitor import get_active_window_rect
 from src.utils import take_screenshot
@@ -40,7 +40,7 @@ from src.utils import take_screenshot
 logger = logging.getLogger(__name__)
 
 _DEFAULT_WINDOW_SECONDS = 180
-_DEFAULT_SAMPLE_INTERVAL = 5
+_DEFAULT_SAMPLE_INTERVAL = 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -113,13 +113,16 @@ class DataRecorder:
         input_monitor,
         hardware_monitor=None,
         window_seconds: int = _DEFAULT_WINDOW_SECONDS,
-        sample_interval: int = _DEFAULT_SAMPLE_INTERVAL,
+        sample_interval: float = _DEFAULT_SAMPLE_INTERVAL,
+        first_capture_delay: float = 0.0,
+        batch_size: int = 10,
+        on_batch_ready: Optional[Callable[[list], None]] = None,
     ) -> None:
         self._input_monitor = input_monitor
         self._hw = hardware_monitor
         self._window_seconds = window_seconds
         self._sample_interval = sample_interval
-        self._max_samples = max(1, window_seconds // sample_interval)
+        self._max_samples = max(1, int(window_seconds / sample_interval))
 
         self._samples: deque = deque(maxlen=self._max_samples)
         self._current_label: str = ""
@@ -127,8 +130,17 @@ class DataRecorder:
         self._lock = threading.Lock()
         self._timer: Optional[threading.Timer] = None
 
+        # First-capture delay
+        self._first_capture_delay = first_capture_delay
+
+        # Batch auto-upload support
+        self._batch_size = batch_size
+        self._on_batch_ready = on_batch_ready
+        self._unflushed: list = []
+        self._unflushed_lock = threading.Lock()
+
         logger.info(
-            "DataRecorder ready — window=%ds interval=%ds max_samples=%d hw=%s",
+            "DataRecorder ready — window=%ds interval=%.2fs max_samples=%d hw=%s",
             window_seconds, sample_interval, self._max_samples,
             type(hardware_monitor).__name__ if hardware_monitor else "none",
         )
@@ -158,6 +170,14 @@ class DataRecorder:
     def max_samples(self) -> int:
         return self._max_samples
 
+    @property
+    def first_capture_delay(self) -> float:
+        return self._first_capture_delay
+
+    @first_capture_delay.setter
+    def first_capture_delay(self, value: float) -> None:
+        self._first_capture_delay = max(0.0, value)
+
     # ------------------------------------------------------------------
     # Control
     # ------------------------------------------------------------------
@@ -169,7 +189,13 @@ class DataRecorder:
             return
         logger.info("Recording started")
         self._recording = True
-        self._schedule_next()
+        if self._first_capture_delay > 0:
+            logger.info("Delaying first capture by %.1fs", self._first_capture_delay)
+            self._timer = threading.Timer(self._first_capture_delay, self._schedule_next)
+            self._timer.daemon = True
+            self._timer.start()
+        else:
+            self._schedule_next()
 
     def stop(self) -> None:
         """Pause capture.  Buffer contents are preserved."""
@@ -186,7 +212,16 @@ class DataRecorder:
         """Discard all buffered samples."""
         with self._lock:
             self._samples.clear()
+        with self._unflushed_lock:
+            self._unflushed.clear()
         logger.info("Buffer cleared")
+
+    def flush_unflushed(self) -> list:
+        """Return and clear any samples not yet sent to the batch callback."""
+        with self._unflushed_lock:
+            batch = list(self._unflushed)
+            self._unflushed.clear()
+        return batch
 
     # ------------------------------------------------------------------
     # Data access
@@ -201,8 +236,14 @@ class DataRecorder:
     # Export
     # ------------------------------------------------------------------
 
-    def export_zip(self, output_path: Path) -> None:
-        """Write the current buffer to a ZIP archive at *output_path*.
+    @staticmethod
+    def export_samples_to_zip(
+        samples: list,
+        output_path: Path,
+        window_seconds: int = 0,
+        sample_interval: float = 0,
+    ) -> None:
+        """Write an arbitrary list of :class:`DataSample` objects to a ZIP.
 
         Archive layout::
 
@@ -211,9 +252,8 @@ class DataRecorder:
             screenshots/
                 <timestamp>.png — one PNG per sample that had a screenshot
         """
-        samples = self.get_samples()
         if not samples:
-            logger.warning("export_zip called with empty buffer — nothing written")
+            logger.warning("export_samples_to_zip called with empty list — nothing written")
             return
 
         output_path = Path(output_path)
@@ -228,8 +268,8 @@ class DataRecorder:
                 meta = {
                     "exported_at": datetime.now(timezone.utc).isoformat(),
                     "sample_count": len(samples),
-                    "window_seconds": self._window_seconds,
-                    "sample_interval": self._sample_interval,
+                    "window_seconds": window_seconds,
+                    "sample_interval": sample_interval,
                     "labels_present": labels_present,
                     "time_range": {
                         "start": samples[0].timestamp,
@@ -260,9 +300,20 @@ class DataRecorder:
             logger.info("Export complete: %s (%.1f KB)", output_path.name, size_kb)
 
         except Exception:
-            logger.exception("export_zip failed")
+            logger.exception("export_samples_to_zip failed")
             tmp_path.unlink(missing_ok=True)
             raise
+
+    def export_zip(self, output_path: Path) -> None:
+        """Write the current buffer to a ZIP archive at *output_path*."""
+        samples = self.get_samples()
+        if not samples:
+            logger.warning("export_zip called with empty buffer — nothing written")
+            return
+        self.export_samples_to_zip(
+            samples, output_path,
+            self._window_seconds, self._sample_interval,
+        )
 
     # ------------------------------------------------------------------
     # Internal
@@ -318,6 +369,21 @@ class DataRecorder:
 
             with self._lock:
                 self._samples.append(sample)
+
+            # Batch auto-upload
+            batch_to_send = None
+            with self._unflushed_lock:
+                self._unflushed.append(sample)
+                if len(self._unflushed) >= self._batch_size and self._on_batch_ready:
+                    batch_to_send = list(self._unflushed)
+                    self._unflushed.clear()
+            if batch_to_send is not None:
+                threading.Thread(
+                    target=self._on_batch_ready,
+                    args=(batch_to_send,),
+                    daemon=True,
+                    name="batch-ready",
+                ).start()
 
             logger.debug(
                 "Sample captured — label=%r cpu_pts=%d ram_pts=%d "
