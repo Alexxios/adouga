@@ -15,7 +15,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.12"
 
       - name: Export requirements
         run: |
@@ -28,6 +28,6 @@ jobs:
         with:
           spec: desktop/dev_main.spec
           requirements: desktop/requirements.txt
-          python_ver: "3.14"
+          python_ver: "3.12"
           clean_checkout: false
           upload_exe_with_name: AdougaDev-windows

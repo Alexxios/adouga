@@ -1304,5 +1304,5 @@ sync-defaults = ["requests"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.14, <3.15"
-content-hash = "c6f87aa6f9e9c4f021262f59fc6833c09ba435a1416b0f999e5d3efa388b0146"
+python-versions = ">=3.12, <3.15"
+content-hash = "2e0d1be9ae7ac2a2e7cd01d12874700aa2c2ae7d74e90276be71438cf1ca8eba"
