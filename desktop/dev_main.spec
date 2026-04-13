@@ -15,6 +15,8 @@ a = Analysis(
         'pynput.mouse._win32',
         'psutil',
         'yadisk',
+        'yadisk.sessions',
+        'yadisk.sessions.requests_session',
         'dotenv',
         'PIL',
         'PIL.Image',
