@@ -6,7 +6,7 @@ from PIL import Image
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from src.inference import ONNXClassifier
+from src.app.inference import ONNXClassifier
 
 
 @pytest.fixture
@@ -20,7 +20,7 @@ def sample_image():
 @pytest.fixture
 def mock_onnx_session():
     """Mock ONNX Runtime session."""
-    with patch('src.inference.ort.InferenceSession') as mock_session:
+    with patch('src.app.inference.ort.InferenceSession') as mock_session:
         # Mock session instance
         session_instance = MagicMock()
         mock_session.return_value = session_instance
@@ -81,7 +81,7 @@ class TestONNXClassifier:
         providers = call_args.kwargs['providers']
         assert providers == ['CPUExecutionProvider']
 
-    @patch('src.inference.ort.get_available_providers')
+    @patch('src.app.inference.ort.get_available_providers')
     def test_get_execution_providers_with_cuda(self, mock_get_providers, mock_onnx_session):
         """Test execution provider selection with CUDA available."""
         mock_get_providers.return_value = [
@@ -97,7 +97,7 @@ class TestONNXClassifier:
         assert 'CUDAExecutionProvider' in providers
         assert 'CPUExecutionProvider' in providers
 
-    @patch('src.inference.ort.get_available_providers')
+    @patch('src.app.inference.ort.get_available_providers')
     def test_get_execution_providers_with_coreml(self, mock_get_providers, mock_onnx_session):
         """Test execution provider selection with CoreML available."""
         mock_get_providers.return_value = [

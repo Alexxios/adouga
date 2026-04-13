@@ -5,13 +5,18 @@ import time as _time
 import tkinter as tk
 from collections import deque
 
-from src.dev.recorder import DataSample
-from src.system_monitor import get_active_window_rect, HardwareMonitor, InputMonitor
-from src.ui import MonitorPage, AIPage, FlicksPage
-from src.ui.theme import ModernTheme
-from src.ui.navbar import ModernNavbar
-from src.utils import take_screenshot
-from src.inference import ONNXClassifier
+from src.core.models import DataSample
+from src.core.window import get_active_window_rect
+from src.core.hardware_monitor import HardwareMonitor
+from src.core.input_monitor import InputMonitor
+from src.core.theme import ModernTheme
+from src.core.screenshot import take_screenshot
+from src.app.ui.monitor_page import MonitorPage
+from src.app.ui.ai_page import AIPage
+from src.app.ui.flicks_page import FlicksPage
+from src.app.ui.distributions_page import DistributionsPage
+from src.app.ui.navbar import ModernNavbar
+from src.app.inference import ONNXClassifier
 
 class SystemMonitorApp(tk.Tk):
     def __init__(self):
@@ -58,12 +63,18 @@ class SystemMonitorApp(tk.Tk):
 
         # --- UI Setup ---
         # Create modern navbar
-        pages = [("AIPage", "AI Analysis"), ("MonitorPage", "Live Stats"), ("FlicksPage", "Mouse Flicks")]
+        pages = [
+            ("AIPage", "AI Analysis"),
+            ("MonitorPage", "Live Stats"),
+            ("FlicksPage", "Mouse Flicks"),
+            ("DistributionsPage", "Distributions"),
+        ]
         self.navbar = ModernNavbar(
             self,
             pages=pages,
             on_page_change=self.show,
-            backend_url="http://0.0.0.0:7999"
+            on_theme_change=self._apply_theme,
+            backend_url="http://0.0.0.0:7999",
         )
         self.navbar.pack(side=tk.TOP, fill=tk.X)
 
@@ -79,7 +90,7 @@ class SystemMonitorApp(tk.Tk):
 
         # Initialize pages
         self.frames = {}
-        for F in (MonitorPage, AIPage, FlicksPage):
+        for F in (MonitorPage, AIPage, FlicksPage, DistributionsPage):
             fname = F.__name__
             frame = F(self.container, self)
             self.frames[fname] = frame
@@ -103,6 +114,15 @@ class SystemMonitorApp(tk.Tk):
         f = self.frames[name]
         f.tkraise()
         f.update_view()
+
+    def _apply_theme(self):
+        """Re-apply theme colours to root window and all pages."""
+        self.configure(bg=ModernTheme.BACKGROUND_DARK)
+        self.container.configure(bg=ModernTheme.BACKGROUND_DARK)
+        ModernTheme.recolor_widget_tree(self)
+        self.navbar.update_view()
+        for frame in self.frames.values():
+            frame.update_view()
 
     def loop(self):
         timestamp = _time.time()

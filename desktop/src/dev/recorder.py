@@ -21,7 +21,6 @@ Per-sample contents
 * ``screenshot``       — PIL image of the active window (excluded from JSON)
 """
 
-import dataclasses
 import io
 import json
 import logging
@@ -29,67 +28,18 @@ import threading
 import time
 import zipfile
 from collections import deque
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
-from src.system_monitor import get_active_window_rect
-from src.utils import take_screenshot
+from src.core.models import DataSample
+from src.core.screenshot import take_screenshot
+from src.core.window import get_active_window_rect
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_WINDOW_SECONDS = 180
 _DEFAULT_SAMPLE_INTERVAL = 0.5
-
-
-# ---------------------------------------------------------------------------
-# Data model
-# ---------------------------------------------------------------------------
-
-@dataclass
-class DataSample:
-    """Single time-stamped data point captured during recording."""
-
-    timestamp: float
-    label: str
-
-    # Hardware histories — rolling 3-min time series from HardwareMonitor
-    cpu_history: list   # [{"timestamp", "percent", "freq_ghz"}, ...]
-    ram_history: list   # [{"timestamp", "percent", "used_gb", "total_gb"}, ...]
-    gpu_history: list   # [{"timestamp", "load_percent", "memory_used_gb", ...}, ...]
-    disk_history: list  # [{"timestamp", "read_bps", "write_bps"}, ...]
-
-    # Input aggregate (since last sample)
-    input_count: int
-    flick_vectors: list  # [(dx, dy), ...]
-
-    # Input detail — rolling 3-min window
-    input_sequence: list  # [{"timestamp", "type", "value"}, ...]
-    key_heatmaps: dict    # {"1s": {key: count}, "5s": ..., ...}
-
-    # Visual (excluded from JSON export)
-    screenshot: Optional[object] = field(default=None, repr=False)
-
-    def to_dict(self) -> dict:
-        """JSON-serialisable representation (screenshot excluded)."""
-        return {
-            "timestamp": self.timestamp,
-            "label": self.label,
-            "cpu_history": self.cpu_history,
-            "ram_history": self.ram_history,
-            "gpu_history": self.gpu_history,
-            "disk_history": self.disk_history,
-            "input_count": self.input_count,
-            "flick_vectors": self.flick_vectors,
-            "input_sequence": self.input_sequence,
-            "key_heatmaps": self.key_heatmaps,
-        }
-
-
-# ---------------------------------------------------------------------------
-# Recorder
-# ---------------------------------------------------------------------------
 
 class DataRecorder:
     """Continuously captures labelled samples into a fixed-size rolling buffer.

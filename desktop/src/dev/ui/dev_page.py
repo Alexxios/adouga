@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Sequence
 
-from src.ui.theme import ModernTheme as T
+from src.core.theme import ModernTheme as T
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class DevPage(tk.Frame):
         # ---- Title ----
         tk.Label(
             self,
-            text="Dev Mode — ML Data Collection",
+            text="Dev Mode \u2014 ML Data Collection",
             bg=T.BACKGROUND_DARK,
             fg=T.TEXT_PRIMARY,
             font=(T.FONT_FAMILY, T.FONT_SIZE_XLARGE, "bold"),
@@ -73,8 +73,8 @@ class DevPage(tk.Frame):
         tk.Label(
             self,
             text=(
-                "Hotkeys: \u25b6 Ctrl+Shift+R — toggle recording "
-                "\u25b6 Ctrl+Shift+N — next state"
+                "Hotkeys: \u25b6 Ctrl+Shift+R \u2014 toggle recording "
+                "\u25b6 Ctrl+Shift+N \u2014 next state"
             ),
             bg=T.BACKGROUND_DARK,
             fg=T.TEXT_SECONDARY,
@@ -174,7 +174,7 @@ class DevPage(tk.Frame):
 
         self._start_btn = tk.Button(
             btn_row,
-            text="▶  Start Recording",
+            text="\u25b6  Start Recording",
             command=self._handle_start,
             **T.button_style("success"),
             width=18,
@@ -183,7 +183,7 @@ class DevPage(tk.Frame):
 
         self._stop_btn = tk.Button(
             btn_row,
-            text="⏹  Stop",
+            text="\u23f9  Stop",
             command=self._on_stop,
             bg=T.ERROR,
             fg=T.TEXT_PRIMARY,
@@ -202,7 +202,7 @@ class DevPage(tk.Frame):
 
         self._save_btn = tk.Button(
             btn_row,
-            text="☁  Flush Now",
+            text="\u2601  Flush Now",
             command=self._on_save,
             **T.button_style("primary"),
             width=16,
@@ -234,7 +234,7 @@ class DevPage(tk.Frame):
             ).pack(side="left")
             val = tk.Label(
                 row,
-                text="—",
+                text="\u2014",
                 bg=T.SURFACE,
                 fg=T.TEXT_PRIMARY,
                 font=(T.FONT_FAMILY, T.FONT_SIZE_NORMAL),
@@ -264,7 +264,7 @@ class DevPage(tk.Frame):
             self._save_btn.config(state="normal")
             self._tester_entry.config(state="disabled")
             self._delay_spinner.config(state="disabled")
-            self._status_val.config(text="Recording…", fg=T.STATUS_ONLINE)
+            self._status_val.config(text="Recording\u2026", fg=T.STATUS_ONLINE)
             logger.debug("DevPage: recording=True")
         else:
             self._start_btn.config(state="normal")
@@ -305,7 +305,7 @@ class DevPage(tk.Frame):
     def set_state(self, label: str) -> None:
         """Programmatically select a state (e.g. from a hotkey)."""
         if label not in self._states:
-            logger.warning("set_state called with unknown label %r — ignored", label)
+            logger.warning("set_state called with unknown label %r \u2014 ignored", label)
             return
         self._state_var.set(label)
         self._on_state_change(label)

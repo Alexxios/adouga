@@ -1,11 +1,11 @@
-"""Tests for src.system_monitor.HardwareMonitor."""
+"""Tests for src.core.hardware_monitor.HardwareMonitor."""
 
 import time
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.system_monitor import HardwareMonitor, _sample_gpu_once
+from src.core.hardware_monitor import HardwareMonitor, _sample_gpu_once
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ def test_disk_delta_computes_bytes_per_second():
     hw = HardwareMonitor(sample_interval=2)
     hw._last_disk_io = MagicMock(read_bytes=0, write_bytes=0)
     current = MagicMock(read_bytes=4000, write_bytes=2000)
-    with patch("src.system_monitor.psutil") as mp:
+    with patch("src.core.hardware_monitor.psutil") as mp:
         mp.disk_io_counters.return_value = current
         result = hw._disk_delta(1000.0)
     assert result["read_bps"]  == pytest.approx(2000.0)
@@ -84,14 +84,14 @@ def test_disk_delta_computes_bytes_per_second():
 def test_disk_delta_returns_none_when_no_counters():
     hw = HardwareMonitor()
     hw._last_disk_io = None
-    with patch("src.system_monitor.psutil") as mp:
+    with patch("src.core.hardware_monitor.psutil") as mp:
         mp.disk_io_counters.return_value = None
         assert hw._disk_delta(1000.0) is None
 
 
 def test_disk_delta_returns_none_on_exception():
     hw = HardwareMonitor()
-    with patch("src.system_monitor.psutil") as mp:
+    with patch("src.core.hardware_monitor.psutil") as mp:
         mp.disk_io_counters.side_effect = OSError("no disk")
         assert hw._disk_delta(1000.0) is None
 
@@ -113,11 +113,11 @@ def _make_psutil_mock(cpu=30.0, ram_pct=50.0, ram_used=4e9, ram_total=8e9, freq_
     return mp
 
 
-@patch("src.system_monitor._sample_gpu_once", return_value=None)
+@patch("src.core.hardware_monitor._sample_gpu_once", return_value=None)
 def test_sample_appends_cpu_entry(mock_gpu):
     hw = HardwareMonitor()
     hw._last_disk_io = None
-    with patch("src.system_monitor.psutil", _make_psutil_mock(cpu=42.0, freq_mhz=3000.0)):
+    with patch("src.core.hardware_monitor.psutil", _make_psutil_mock(cpu=42.0, freq_mhz=3000.0)):
         hw._sample()
     hist = hw.get_cpu_history()
     assert len(hist) == 1
@@ -125,11 +125,11 @@ def test_sample_appends_cpu_entry(mock_gpu):
     assert hist[0]["freq_ghz"] == pytest.approx(3.0, abs=0.001)
 
 
-@patch("src.system_monitor._sample_gpu_once", return_value=None)
+@patch("src.core.hardware_monitor._sample_gpu_once", return_value=None)
 def test_sample_appends_ram_entry(mock_gpu):
     hw = HardwareMonitor()
     hw._last_disk_io = None
-    with patch("src.system_monitor.psutil",
+    with patch("src.core.hardware_monitor.psutil",
                _make_psutil_mock(ram_pct=75.0, ram_used=12e9, ram_total=16e9)):
         hw._sample()
     hist = hw.get_ram_history()
@@ -138,14 +138,14 @@ def test_sample_appends_ram_entry(mock_gpu):
     assert hist[0]["total_gb"] == pytest.approx(16.0, abs=0.01)
 
 
-@patch("src.system_monitor._sample_gpu_once")
+@patch("src.core.hardware_monitor._sample_gpu_once")
 def test_sample_appends_gpu_entry_when_available(mock_gpu):
     gpu_reading = {"load_percent": 55.0, "memory_used_gb": 4.0,
                    "memory_total_gb": 8.0, "temperature_c": 70}
     mock_gpu.return_value = gpu_reading
     hw = HardwareMonitor()
     hw._last_disk_io = None
-    with patch("src.system_monitor.psutil", _make_psutil_mock()):
+    with patch("src.core.hardware_monitor.psutil", _make_psutil_mock()):
         hw._sample()
     hist = hw.get_gpu_history()
     assert len(hist) == 1
@@ -153,22 +153,22 @@ def test_sample_appends_gpu_entry_when_available(mock_gpu):
     assert "timestamp" in hist[0]
 
 
-@patch("src.system_monitor._sample_gpu_once", return_value=None)
+@patch("src.core.hardware_monitor._sample_gpu_once", return_value=None)
 def test_sample_skips_gpu_entry_when_unavailable(mock_gpu):
     hw = HardwareMonitor()
     hw._last_disk_io = None
-    with patch("src.system_monitor.psutil", _make_psutil_mock()):
+    with patch("src.core.hardware_monitor.psutil", _make_psutil_mock()):
         hw._sample()
     assert hw.get_gpu_history() == []
 
 
-@patch("src.system_monitor._sample_gpu_once", return_value=None)
+@patch("src.core.hardware_monitor._sample_gpu_once", return_value=None)
 def test_sample_appends_disk_entry(mock_gpu):
     hw = HardwareMonitor(sample_interval=1)
     hw._last_disk_io = MagicMock(read_bytes=0, write_bytes=0)
     mp = _make_psutil_mock()
     mp.disk_io_counters.return_value = MagicMock(read_bytes=1000, write_bytes=500)
-    with patch("src.system_monitor.psutil", mp):
+    with patch("src.core.hardware_monitor.psutil", mp):
         hw._sample()
     hist = hw.get_disk_history()
     assert len(hist) == 1
@@ -180,12 +180,12 @@ def test_sample_appends_disk_entry(mock_gpu):
 # HardwareMonitor — rolling buffer
 # ---------------------------------------------------------------------------
 
-@patch("src.system_monitor._sample_gpu_once", return_value=None)
+@patch("src.core.hardware_monitor._sample_gpu_once", return_value=None)
 def test_buffer_evicts_old_entries(mock_gpu):
     hw = HardwareMonitor(sample_interval=1, buffer_seconds=3)
     assert hw._cpu_hist.maxlen == 3
     hw._last_disk_io = None
-    with patch("src.system_monitor.psutil", _make_psutil_mock()):
+    with patch("src.core.hardware_monitor.psutil", _make_psutil_mock()):
         for _ in range(5):
             hw._sample()
     assert len(hw.get_cpu_history()) == 3
@@ -198,8 +198,8 @@ def test_buffer_evicts_old_entries(mock_gpu):
 def test_start_stop_does_not_raise():
     hw = HardwareMonitor(sample_interval=1, buffer_seconds=5)
     with (
-        patch("src.system_monitor.psutil") as mp,
-        patch("src.system_monitor._sample_gpu_once", return_value=None),
+        patch("src.core.hardware_monitor.psutil") as mp,
+        patch("src.core.hardware_monitor._sample_gpu_once", return_value=None),
     ):
         mp.cpu_percent.return_value = 10.0
         mp.cpu_freq.return_value = MagicMock(current=2000.0)
@@ -213,8 +213,8 @@ def test_start_stop_does_not_raise():
 def test_double_start_is_safe():
     hw = HardwareMonitor()
     with (
-        patch("src.system_monitor.psutil") as mp,
-        patch("src.system_monitor._sample_gpu_once", return_value=None),
+        patch("src.core.hardware_monitor.psutil") as mp,
+        patch("src.core.hardware_monitor._sample_gpu_once", return_value=None),
     ):
         mp.cpu_percent.return_value = 0.0
         mp.cpu_freq.return_value = None
@@ -231,7 +231,7 @@ def test_double_start_is_safe():
 
 def test_hardware_monitor_collects_real_data():
     hw = HardwareMonitor(sample_interval=1, buffer_seconds=5)
-    with patch("src.system_monitor._sample_gpu_once", return_value=None):
+    with patch("src.core.hardware_monitor._sample_gpu_once", return_value=None):
         hw.start()
         time.sleep(1.5)
         hw.stop()

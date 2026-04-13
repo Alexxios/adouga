@@ -20,13 +20,14 @@ import sys
 import tkinter as tk
 from pathlib import Path
 
+from src.core.hardware_monitor import HardwareMonitor
+from src.core.input_monitor import InputMonitor
+from src.core.theme import ModernTheme as T
 from src.dev.batch_uploader import BatchUploader
 from src.dev.hotkeys import HotkeyManager
 from src.dev.recorder import DataRecorder
 from src.dev.uploader import YaDiskUploader
-from src.system_monitor import HardwareMonitor, InputMonitor
-from src.ui.dev_page import DevPage
-from src.ui.theme import ModernTheme as T
+from src.dev.ui.dev_page import DevPage
 
 _DEFAULT_STATES = ["Idle", "Not Gaming", "Gaming"]
 _DEFAULT_OUTPUT_DIR = Path.home() / "adouga_ml_data"

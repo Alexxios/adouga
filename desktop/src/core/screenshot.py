@@ -1,8 +1,8 @@
-# ==========================================
-# 2. SCREENSHOT UTILS
-# ==========================================
+"""Screenshot capture utilities."""
+
 import mss
 from PIL import Image
+
 
 def take_screenshot(rect):
     if not rect: return None

@@ -10,7 +10,7 @@ from typing import Optional
 import urllib.request
 import urllib.error
 
-from .theme import ModernTheme
+from src.core.theme import ModernTheme
 
 
 class NetworkIndicator(tk.Frame):

@@ -18,7 +18,7 @@ class ONNXClassifier:
         """
         if model_path is None:
             # Default path relative to desktop module
-            model_path = Path(__file__).parent.parent.parent / "ml" / "models" / "model.onnx"
+            model_path = Path(__file__).parent.parent.parent.parent / "ml" / "models" / "model.onnx"
 
         self.model_path = str(model_path)
 

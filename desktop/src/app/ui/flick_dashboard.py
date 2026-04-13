@@ -8,13 +8,13 @@ import tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from .theme import ModernTheme
+from src.core.theme import ModernTheme
 
 
 class FlickDashboard(tk.Frame):
     """Polar chart showing recent mouse flick vectors.
 
-    Directions are mapped to screen space: right=→, down=↓, left=←, up=↑.
+    Directions are mapped to screen space: right=\u2192, down=\u2193, left=\u2190, up=\u2191.
     Newer flicks are brighter; the most recent is highlighted in orange.
     """
 
@@ -45,9 +45,9 @@ class FlickDashboard(tk.Frame):
         ax.spines["polar"].set_color(ModernTheme.BORDER)
         ax.grid(color=ModernTheme.BORDER, alpha=0.4)
         ax.set_yticklabels([])
-        # Screen-space cardinal directions: negate dy so down=↓ at plot bottom
+        # Screen-space cardinal directions: negate dy so down=\u2193 at plot bottom
         ax.set_xticks([0, math.pi / 2, math.pi, 3 * math.pi / 2])
-        ax.set_xticklabels(["→", "↑", "←", "↓"], color=ModernTheme.TEXT_SECONDARY, fontsize=11)
+        ax.set_xticklabels(["\u2192", "\u2191", "\u2190", "\u2193"], color=ModernTheme.TEXT_SECONDARY, fontsize=11)
 
     def update_view(self, flicks: list):
         """Redraw with new flick vectors.
@@ -55,6 +55,7 @@ class FlickDashboard(tk.Frame):
         Args:
             flicks: list of (dx, dy) tuples in screen coords, oldest first
         """
+        ModernTheme.style_matplotlib_figure(self.fig)
         self.ax.cla()
         self._style_axes()
 
