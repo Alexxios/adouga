@@ -1,7 +1,8 @@
 """Global hotkey manager for dev mode.
 
-Registers system-wide hotkeys via pynput so they work even when the
-application window is not focused.
+Registers hotkeys through an existing :class:`InputMonitor` so they share
+a single pynput keyboard listener — avoids the double-hook conflict that
+breaks ``GlobalHotKeys`` in PyInstaller windowed builds on Windows.
 
 Default bindings:
     Ctrl+Shift+R — toggle recording on/off
@@ -11,7 +12,7 @@ Default bindings:
 import logging
 from typing import Callable, Optional
 
-from pynput import keyboard
+from src.core.input_monitor import InputMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ DEFAULT_NEXT_STATE_HOTKEY = "<ctrl>+<shift>+n"
 
 
 class HotkeyManager:
-    """Registers and manages global hotkeys for the dev application.
+    """Registers global hotkeys via an :class:`InputMonitor`.
 
     Callbacks are invoked from the pynput listener thread; use
     ``root.after(0, callback)`` inside the callbacks if you need to touch
@@ -28,6 +29,8 @@ class HotkeyManager:
 
     Parameters
     ----------
+    input_monitor:
+        The running InputMonitor whose keyboard listener will handle hotkeys.
     on_toggle_recording:
         Called when the toggle-recording hotkey fires.
     on_next_state:
@@ -40,16 +43,18 @@ class HotkeyManager:
 
     def __init__(
         self,
+        input_monitor: Optional[InputMonitor],
         on_toggle_recording: Callable[[], None],
         on_next_state: Callable[[], None],
         toggle_hotkey: str = DEFAULT_TOGGLE_HOTKEY,
         next_state_hotkey: str = DEFAULT_NEXT_STATE_HOTKEY,
     ) -> None:
+        self._input_monitor = input_monitor
         self._on_toggle = on_toggle_recording
         self._on_next_state = on_next_state
         self._toggle_hotkey = toggle_hotkey
         self._next_state_hotkey = next_state_hotkey
-        self._listener: Optional[keyboard.GlobalHotKeys] = None
+        self._started = False
 
         logger.info(
             "HotkeyManager configured — toggle=%s  next_state=%s",
@@ -62,29 +67,24 @@ class HotkeyManager:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        """Register hotkeys and start listening in a daemon thread."""
-        if self._listener is not None:
+        """Register hotkeys on the InputMonitor's listener."""
+        if self._started:
             logger.warning("start() called while already running — ignored")
             return
 
-        self._listener = keyboard.GlobalHotKeys(
-            {
-                self._toggle_hotkey: self._handle_toggle,
-                self._next_state_hotkey: self._handle_next_state,
-            }
-        )
-        self._listener.daemon = True
-        self._listener.start()
-        logger.info("Global hotkeys registered and listening")
+        if self._input_monitor is None:
+            logger.warning("No InputMonitor available — hotkeys disabled")
+            return
+
+        self._input_monitor.add_hotkey(self._toggle_hotkey, self._handle_toggle)
+        self._input_monitor.add_hotkey(self._next_state_hotkey, self._handle_next_state)
+        self._started = True
+        logger.info("Global hotkeys registered")
 
     def stop(self) -> None:
-        """Unregister hotkeys and stop the listener thread."""
-        if self._listener is None:
-            logger.warning("stop() called while not running — ignored")
-            return
-        self._listener.stop()
-        self._listener = None
-        logger.info("Global hotkeys stopped")
+        """No-op — hotkeys are cleaned up when InputMonitor stops."""
+        self._started = False
+        logger.info("HotkeyManager stopped")
 
     # ------------------------------------------------------------------
     # Internal handlers

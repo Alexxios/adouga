@@ -173,6 +173,7 @@ class DevApp(tk.Tk):
 
         # ---- Hotkey manager ----
         self._hotkeys = HotkeyManager(
+            input_monitor=self._input_monitor,
             on_toggle_recording=self._toggle_recording,
             on_next_state=self._hotkey_next_state,
         )

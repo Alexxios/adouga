@@ -58,7 +58,14 @@ class InputMonitor:
         # {"timestamp": float, "type": str, "value": str}
         self._events: deque = deque()
 
-        self.kb_listener = keyboard.Listener(on_press=self._on_key_press)
+        # Hotkeys — registered via add_hotkey(); checked inside the single
+        # keyboard listener so we never need a second pynput hook.
+        self._hotkeys: list[keyboard.HotKey] = []
+
+        self.kb_listener = keyboard.Listener(
+            on_press=self._on_key_press,
+            on_release=self._on_key_release,
+        )
         self.mouse_listener = mouse.Listener(
             on_click=self._on_mouse_click,
             on_scroll=self._on_mouse_scroll,
@@ -77,6 +84,13 @@ class InputMonitor:
         with self._lock:
             self.counter += 1
             self._record_event("key_press", name)
+        # Forward to hotkeys (uses canonical form from the listener)
+        for hk in self._hotkeys:
+            hk.press(self.kb_listener.canonical(key))
+
+    def _on_key_release(self, key) -> None:
+        for hk in self._hotkeys:
+            hk.release(self.kb_listener.canonical(key))
 
     def _on_mouse_click(self, x, y, button, pressed) -> None:
         if not pressed:
@@ -172,6 +186,22 @@ class InputMonitor:
             list(result.keys()),
         )
         return result
+
+    def add_hotkey(self, hotkey_str: str, callback) -> None:
+        """Register a global hotkey handled by the existing keyboard listener.
+
+        Uses :class:`pynput.keyboard.HotKey` so no second listener is needed.
+
+        Parameters
+        ----------
+        hotkey_str:
+            pynput hotkey string, e.g. ``"<ctrl>+<shift>+r"``.
+        callback:
+            Zero-argument callable invoked when the hotkey fires.
+        """
+        hk = keyboard.HotKey(keyboard.HotKey.parse(hotkey_str), callback)
+        self._hotkeys.append(hk)
+        logger.info("Hotkey registered: %s", hotkey_str)
 
     def stop(self) -> None:
         """Stop both pynput listener threads."""
