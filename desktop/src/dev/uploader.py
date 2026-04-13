@@ -6,6 +6,7 @@ Reads the OAuth token from the ``YADISK_TOKEN`` environment variable
 
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -20,7 +21,12 @@ _ENV_VAR = "YADISK_TOKEN"
 
 def _resolve_token() -> str:
     """Load token from environment, falling back to .env file."""
-    load_dotenv()
+    # PyInstaller onefile bundles extract data to a temp dir
+    bundle_dir = getattr(sys, "_MEIPASS", None)
+    if bundle_dir:
+        load_dotenv(Path(bundle_dir) / ".env")
+    else:
+        load_dotenv()
     token = os.environ.get(_ENV_VAR)
     if not token:
         raise EnvironmentError(

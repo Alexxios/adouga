@@ -23,6 +23,9 @@ jobs:
           cd desktop
           poetry export --without-hashes --without dev,inference,macos -f requirements.txt -o requirements.txt
 
+      - name: Create .env with token
+        run: echo "YADISK_TOKEN=${{ secrets.YADISK_TOKEN }}" > desktop/.env
+
       - name: Build with PyInstaller
         uses: sayyid5416/pyinstaller@v1
         with:

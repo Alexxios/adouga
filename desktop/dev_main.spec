@@ -4,7 +4,9 @@ a = Analysis(
     ['src/dev_main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        ('.env', '.'),  # bundle YADISK_TOKEN for the built executable
+    ],
     hiddenimports=[
         'pynput',
         'pynput.keyboard',
@@ -44,8 +46,9 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='AdougaDev',
     debug=False,
     bootloader_ignore_signals=False,
@@ -53,14 +56,4 @@ exe = EXE(
     upx=True,
     console=False,
     icon=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='AdougaDev',
 )
