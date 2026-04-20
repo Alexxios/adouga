@@ -25,21 +25,17 @@ else:  # Linux
     platform_excludes = ['pyobjc', 'Quartz', 'Cocoa']
 
 a = Analysis(
-    ['src/dev_main.py'],
+    ['src/main.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('.env', '.'),  # bundle YADISK_TOKEN for the built executable
+        ('../ml/models/model.onnx', 'ml/models'),  # bundle ONNX model
     ],
     hiddenimports=[
         'pynput',
         'pynput.keyboard',
         'pynput.mouse',
         'psutil',
-        'yadisk',
-        'yadisk.sessions',
-        'yadisk.sessions.requests_session',
-        'dotenv',
         'PIL',
         'PIL.Image',
         'PIL.ImageTk',
@@ -50,13 +46,15 @@ a = Analysis(
         'GPUtil',
         'setuptools',
         'pkg_resources.extern',
+        'numpy',
+        'onnxruntime',
     ] + platform_imports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        'onnxruntime',
-        'onnxruntime_gpu',
+        'yadisk',
+        'dotenv',
     ] + platform_excludes,
     noarchive=False,
 )
@@ -69,7 +67,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='AdougaDev',
+    name='Adouga',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -1,5 +1,6 @@
 """ONNX inference module for image classification."""
 
+import sys
 import numpy as np
 from pathlib import Path
 from PIL import Image
@@ -17,8 +18,12 @@ class ONNXClassifier:
             use_gpu: Whether to try using GPU acceleration if available.
         """
         if model_path is None:
-            # Default path relative to desktop module
-            model_path = Path(__file__).parent.parent.parent.parent / "ml" / "models" / "model.onnx"
+            if getattr(sys, 'frozen', False):
+                # Running as PyInstaller bundle
+                model_path = Path(sys._MEIPASS) / "ml" / "models" / "model.onnx"
+            else:
+                # Default path relative to desktop module
+                model_path = Path(__file__).parent.parent.parent.parent / "ml" / "models" / "model.onnx"
 
         self.model_path = str(model_path)
 

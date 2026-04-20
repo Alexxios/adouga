@@ -21,7 +21,7 @@ from src.app.inference import ONNXClassifier
 class SystemMonitorApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Adouga - Activity Detection & Observation")
+        self.title("Adouga - Automatic Detection of User Gaming Activity")
         self.geometry("1200x800")
         self.configure(bg=ModernTheme.BACKGROUND_DARK)
 

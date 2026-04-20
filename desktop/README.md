@@ -1,4 +1,4 @@
-# Adouga - Activity Detection and Observation Using Gaming Analytics
+# Adouga - Automatic Detection of User Gaming Activity
 
 A Python-based system monitoring and AI prediction application that captures screenshots of the foreground application and uses machine learning to classify activity.
 

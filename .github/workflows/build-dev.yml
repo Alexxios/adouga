@@ -1,0 +1,56 @@
+name: Build Dev App
+
+on: [push]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    env:
+      PYNPUT_BACKEND: dummy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install poetry poetry-plugin-export
+          cd desktop
+          poetry export --without-hashes --without dev --with macos -f requirements.txt -o requirements.txt
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Create .env with token
+        run: echo "YADISK_TOKEN=${{ secrets.YADISK_TOKEN }}" > desktop/.env
+
+      - name: Build with PyInstaller
+        run: |
+          cd desktop
+          pyinstaller dev_main.spec
+
+      - name: Build Inno Setup installer
+        if: runner.os == 'Windows'
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" desktop\installer.iss
+        shell: pwsh
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: AdougaDev-${{ runner.os }}
+          path: desktop/dist/AdougaDev*
+
+      - name: Upload installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AdougaDevSetup-Windows
+          path: desktop/output/AdougaDevSetup.exe

@@ -1,0 +1,53 @@
+name: Build Main App
+
+on: [push]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    env:
+      PYNPUT_BACKEND: dummy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install poetry poetry-plugin-export
+          cd desktop
+          poetry export --without-hashes --without dev --with inference,macos -f requirements.txt -o requirements.txt
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          cd desktop
+          pyinstaller main.spec
+
+      - name: Build Inno Setup installer
+        if: runner.os == 'Windows'
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" desktop\installer_main.iss
+        shell: pwsh
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: Adouga-${{ runner.os }}
+          path: desktop/dist/Adouga*
+
+      - name: Upload installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AdougaSetup-Windows
+          path: desktop/output/AdougaSetup.exe

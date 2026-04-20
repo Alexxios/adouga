@@ -32,7 +32,7 @@ optional = true
 [tool.poetry.group.inference.dependencies]
 # ONNX Inference (no torch needed)
 onnxruntime-gpu = { version = "*", platform = "win32" }
-onnxruntime = { version = "*", platform = "darwin" }
+onnxruntime = { version = "*", markers = "sys_platform != 'win32'" }
 
 [tool.poetry.group.macos]
 optional = true
