@@ -549,7 +549,7 @@ description = "Bindings to the Linux input handling subsystem"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "sys_platform != \"win32\" and sys_platform != \"emscripten\" and \"linux\" in sys_platform"
+markers = "\"linux\" in sys_platform"
 files = [
     {file = "evdev-1.9.3.tar.gz", hash = "sha256:2c140e01ac8437758fa23fe5c871397412461f42d421aa20241dc8fe8cfccbc9"},
 ]
@@ -2867,13 +2867,28 @@ files = [
 six = ">=1.5"
 
 [[package]]
+name = "python-dotenv"
+version = "1.2.2"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "python_dotenv-1.2.2-py3-none-any.whl", hash = "sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a"},
+    {file = "python_dotenv-1.2.2.tar.gz", hash = "sha256:2c371a91fbd7ba082c2c1dc1f8bf89ca22564a087c2c287cd9b662adde799cf3"},
+]
+
+[package.extras]
+cli = ["click (>=5.0)"]
+
+[[package]]
 name = "python-xlib"
 version = "0.33"
 description = "Python X Library"
 optional = false
 python-versions = "*"
 groups = ["main"]
-markers = "sys_platform != \"win32\" and sys_platform != \"emscripten\" and \"linux\" in sys_platform"
+markers = "\"linux\" in sys_platform"
 files = [
     {file = "python-xlib-0.33.tar.gz", hash = "sha256:55af7906a2c75ce6cb280a584776080602444f75815a7aff4d287bb2d7018b32"},
     {file = "python_xlib-0.33-py2.py3-none-any.whl", hash = "sha256:c3534038d42e0df2f1392a1b30a15a4ff5fdc2b86cfa94f072bf11b10a164398"},
@@ -3636,6 +3651,27 @@ files = [
 ]
 
 [[package]]
+name = "yadisk"
+version = "3.4.1"
+description = "Библиотека-клиент REST API Яндекс.Диска / Yandex.Disk REST API client library"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "yadisk-3.4.1-py3-none-any.whl", hash = "sha256:1498c8b23731b4262ad29e11de053a57902ea17daaa8ba07de27d1525a4028ac"},
+    {file = "yadisk-3.4.1.tar.gz", hash = "sha256:17d9092c6566244253be8694505bfb52bc351f27ceb56041798df87d8992d39a"},
+]
+
+[package.extras]
+aiohttp = ["aiohttp"]
+async-defaults = ["aiofiles", "httpx"]
+async-files = ["aiofiles"]
+httpx = ["httpx"]
+pycurl = ["pycurl"]
+requests = ["requests"]
+sync-defaults = ["requests"]
+
+[[package]]
 name = "yarl"
 version = "1.22.0"
 description = "Yet another URL library"
@@ -3783,4 +3819,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14, <3.15"
-content-hash = "c1089bb71d4b1ce9e79745c4c845142fd4c41e4153584af758fcf157c56309f4"
+content-hash = "f0acab465791b65b11301fda37357620330bfb60873f563c74ccbfd464cc8f17"

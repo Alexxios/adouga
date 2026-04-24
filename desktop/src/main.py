@@ -13,7 +13,6 @@ from src.core.theme import ModernTheme
 from src.core.screenshot import take_screenshot
 from src.app.ui.monitor_page import MonitorPage
 from src.app.ui.ai_page import AIPage
-from src.app.ui.flicks_page import FlicksPage
 from src.app.ui.distributions_page import DistributionsPage
 from src.app.ui.navbar import ModernNavbar
 from src.app.inference import ONNXClassifier
@@ -66,7 +65,6 @@ class SystemMonitorApp(tk.Tk):
         pages = [
             ("AIPage", "AI Analysis"),
             ("MonitorPage", "Live Stats"),
-            ("FlicksPage", "Mouse Flicks"),
             ("DistributionsPage", "Distributions"),
         ]
         self.navbar = ModernNavbar(
@@ -90,7 +88,7 @@ class SystemMonitorApp(tk.Tk):
 
         # Initialize pages
         self.frames = {}
-        for F in (MonitorPage, AIPage, FlicksPage, DistributionsPage):
+        for F in (MonitorPage, AIPage, DistributionsPage):
             fname = F.__name__
             frame = F(self.container, self)
             self.frames[fname] = frame

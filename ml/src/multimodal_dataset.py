@@ -25,7 +25,7 @@ from src.feature_engineering import TABULAR_DIM, extract_tabular_features
 
 logger = logging.getLogger(__name__)
 
-_LABEL_MAP = {"Gaming": 0, "Not Gaming": 1}
+_LABEL_MAP = {"Idle": 0, "Not Gaming": 1, "Gaming": 2}
 
 
 def _default_transform() -> transforms.Compose:

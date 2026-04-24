@@ -17,7 +17,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from src.multimodal_dataset import split_multimodal_dataset
+from src.multimodal_dataset import split_multimodal_dataset, _LABEL_MAP
 from src.multimodal_model import MultimodalGameClassifier
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,8 @@ def train_multimodal(
     lr: float = 0.001,
     unfreeze_epoch: int = 5,
     test_ratio: float = 0.2,
+    output_path: str = "models/multimodal_best.pth",
+    seed: int = 42,
 ) -> None:
     """Train the multimodal classifier end-to-end.
 
@@ -61,7 +63,7 @@ def train_multimodal(
 
     # ---- Data ----
     train_subset, test_subset = split_multimodal_dataset(
-        zip_paths, test_ratio=test_ratio,
+        zip_paths, test_ratio=test_ratio, seed=seed,
     )
     print(f"Train: {len(train_subset)}, Test: {len(test_subset)}")
     if len(train_subset) == 0:
@@ -72,7 +74,9 @@ def train_multimodal(
     test_loader = DataLoader(test_subset, batch_size=batch_size, shuffle=False)
 
     # ---- Model ----
-    model = MultimodalGameClassifier().to(device)
+    num_classes = len(_LABEL_MAP)
+    print(f"Classes: {num_classes} ({', '.join(_LABEL_MAP)})")
+    model = MultimodalGameClassifier(num_classes=num_classes).to(device)
     model.freeze_backbone()
     print("Backbone frozen for initial training phase")
 
@@ -147,9 +151,10 @@ def train_multimodal(
 
         if test_acc > best_acc:
             best_acc = test_acc
-            Path("models").mkdir(exist_ok=True)
-            torch.save(model.state_dict(), "models/multimodal_best.pth")
-            print(f"  Saved best model (acc: {best_acc:.4f})")
+            output = Path(output_path)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(model.state_dict(), output)
+            print(f"  Saved best model to {output} (acc: {best_acc:.4f})")
 
     print(f"\nTraining complete! Best accuracy: {best_acc:.4f}")
 
@@ -173,6 +178,10 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--unfreeze-epoch", type=int, default=5)
     parser.add_argument("--test-ratio", type=float, default=0.2)
+    parser.add_argument(
+        "--output", default="models/multimodal_best.pth",
+        help="Checkpoint path for the best model (default: models/multimodal_best.pth)",
+    )
     args = parser.parse_args()
 
     zip_paths = args.zips or sorted(glob("data/zips/*.zip"))
@@ -188,6 +197,7 @@ def main() -> None:
         lr=args.lr,
         unfreeze_epoch=args.unfreeze_epoch,
         test_ratio=args.test_ratio,
+        output_path=args.output,
     )
 
 

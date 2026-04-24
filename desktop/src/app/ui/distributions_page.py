@@ -1,7 +1,7 @@
 """Distributions page — keyboard heatmap and input distribution charts."""
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 
 from src.core.theme import ModernTheme
 from src.core.input_monitor import _HEATMAP_INTERVALS
@@ -44,6 +44,20 @@ class DistributionsPage(tk.Frame):
             padx=16, pady=6,
         )
         self._charts_btn.pack(side=tk.LEFT)
+
+        # Export button (right side, before interval)
+        tk.Button(
+            top_bar,
+            text="Export",
+            command=self._export,
+            bd=0, relief="flat", cursor="hand2",
+            bg=ModernTheme.SURFACE_ELEVATED,
+            fg=ModernTheme.TEXT_PRIMARY,
+            activebackground=ModernTheme.BACKGROUND_LIGHT,
+            activeforeground=ModernTheme.TEXT_PRIMARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_SMALL),
+            padx=10, pady=3,
+        ).pack(side=tk.RIGHT, padx=(0, 15))
 
         # Interval selector (right side)
         interval_frame = tk.Frame(top_bar, bg=ModernTheme.BACKGROUND_DARK)
@@ -116,6 +130,27 @@ class DistributionsPage(tk.Frame):
         else:
             self._heatmap_btn.config(**inactive_cfg)
             self._charts_btn.config(**active_cfg)
+
+    # ---- Export -------------------------------------------------------
+
+    def _export(self) -> None:
+        if self._active_view == "charts":
+            path = filedialog.asksaveasfilename(
+                defaultextension=".png",
+                filetypes=[("PNG Image", "*.png"), ("SVG Vector", "*.svg"), ("PDF Document", "*.pdf")],
+                title="Export Distribution Charts",
+            )
+            if path:
+                fig = self._charts_view.fig
+                fig.savefig(path, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
+        else:
+            path = filedialog.asksaveasfilename(
+                defaultextension=".eps",
+                filetypes=[("EPS Vector", "*.eps"), ("PostScript", "*.ps")],
+                title="Export Keyboard Heatmap",
+            )
+            if path:
+                self._heatmap_view.export(path)
 
     # ---- Data refresh -------------------------------------------------
 

@@ -125,6 +125,10 @@ class KeyboardHeatmapView(tk.Frame):
         self._counts = counts
         self._draw()
 
+    def export(self, path: str) -> None:
+        """Export the heatmap canvas as a PostScript / EPS file."""
+        self.canvas.postscript(file=path, colormode="color")
+
     # ---- Drawing ------------------------------------------------------
 
     def _draw(self) -> None:

@@ -72,7 +72,6 @@ class DistributionChartsView(tk.Frame):
         colors = self._pie_colors(len(labels))
         wedges, texts, autotexts = ax.pie(
             values,
-            labels=labels,
             colors=colors,
             autopct="%1.0f%%",
             startangle=90,
@@ -82,6 +81,15 @@ class DistributionChartsView(tk.Frame):
         for t in autotexts:
             t.set_fontsize(7)
             t.set_color(ModernTheme.TEXT_SECONDARY)
+
+        ax.legend(
+            wedges, labels,
+            loc="center left", bbox_to_anchor=(-0.35, 0.5),
+            fontsize=7, framealpha=0.5,
+            facecolor=ModernTheme.BACKGROUND_DARK,
+            edgecolor=ModernTheme.BORDER,
+            labelcolor=ModernTheme.TEXT_SECONDARY,
+        )
 
         ax.set_title(
             "Key Press Distribution",
@@ -120,7 +128,7 @@ class DistributionChartsView(tk.Frame):
         max_bin = max(bins) or 1
 
         colors = [self._polar_bar_color(b, max_bin) for b in bins]
-        ax.bar(
+        bars = ax.bar(
             angles, bins,
             width=bin_width * 0.85,
             color=colors,
@@ -129,6 +137,17 @@ class DistributionChartsView(tk.Frame):
             alpha=0.85,
         )
 
+        # Count labels on bars
+        for angle, count, bar in zip(angles, bins, bars):
+            if count > 0:
+                ax.text(
+                    angle, count + max_bin * 0.05,
+                    str(count),
+                    ha="center", va="bottom",
+                    color=ModernTheme.TEXT_SECONDARY,
+                    fontsize=7,
+                )
+
         # Cardinal labels
         ax.set_xticks([0, math.pi / 2, math.pi, 3 * math.pi / 2])
         ax.set_xticklabels(
@@ -136,7 +155,7 @@ class DistributionChartsView(tk.Frame):
             color=ModernTheme.TEXT_SECONDARY, fontsize=11,
         )
         ax.set_title(
-            "Flick Directions",
+            f"Flick Directions ({len(flicks)} total)",
             color=ModernTheme.TEXT_PRIMARY, fontsize=12, fontweight="bold",
         )
 
