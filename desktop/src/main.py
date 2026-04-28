@@ -140,8 +140,10 @@ class SystemMonitorApp(tk.Tk):
         # 2. Input aggregates since last tick
         if self.input_monitor:
             input_since_last = build_input_since_last(self.input_monitor)
+            key_heatmaps = self.input_monitor.get_key_heatmaps()
         else:
             input_since_last = build_input_since_last(object())
+            key_heatmaps = {}
 
         # 3. Foreground window + screenshot
         rect, app_name, window_title = get_active_window_info()
@@ -155,6 +157,7 @@ class SystemMonitorApp(tk.Tk):
             window_title=window_title,
             hw_recent=list(self._hw_recent),
             input_since_last=input_since_last,
+            key_heatmaps=key_heatmaps,
             screenshot=self.current_image,
         )
         self._samples.append(sample)

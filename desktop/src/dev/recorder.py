@@ -160,6 +160,12 @@ class DataRecorder:
                 logger.debug(
                     "get_and_reset_input_aggregates drain failed", exc_info=True,
                 )
+        # Drop pre-launch events so heatmaps don't include them.
+        if hasattr(self._input_monitor, "clear_events"):
+            try:
+                self._input_monitor.clear_events()
+            except Exception:
+                logger.debug("clear_events failed", exc_info=True)
         self._hw_recent.clear()
 
         self._recording = True
@@ -316,6 +322,14 @@ class DataRecorder:
             # Input — drain so each sample reflects only this 1s window.
             input_since_last = build_input_since_last(self._input_monitor)
 
+            # Multi-window key-press heatmaps (1s/5s/15s/30s/1m/3m). The 1s
+            # window is per-sample-aligned; longer windows give session
+            # context.
+            key_heatmaps = (
+                self._input_monitor.get_key_heatmaps()
+                if hasattr(self._input_monitor, "get_key_heatmaps") else {}
+            )
+
             # Foreground window
             rect, app_name, window_title = get_active_window_info()
             screenshot = take_screenshot(rect) if rect else None
@@ -327,6 +341,7 @@ class DataRecorder:
                 window_title=window_title,
                 hw_recent=hw_recent,
                 input_since_last=input_since_last,
+                key_heatmaps=key_heatmaps,
                 screenshot=screenshot,
             )
 

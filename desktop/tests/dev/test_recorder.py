@@ -53,6 +53,15 @@ _INPUT_AGG = {
     "flick_dy_mean": 0.0,
 }
 
+_HEATMAPS = {
+    "1s":  {"w": 1},
+    "5s":  {"w": 3, "a": 1},
+    "15s": {"w": 5, "a": 2},
+    "30s": {"w": 8, "a": 3, "space": 1},
+    "1m":  {"w": 12, "a": 5, "space": 2},
+    "3m":  {"w": 20, "a": 9, "space": 4, "shift": 1},
+}
+
 _BASE_SAMPLE = DataSample(
     timestamp=1000.0,
     label="Gaming",
@@ -60,6 +69,7 @@ _BASE_SAMPLE = DataSample(
     window_title="VALORANT",
     hw_recent=[dict(_HW_SLOT)],
     input_since_last=dict(_INPUT_AGG),
+    key_heatmaps=dict(_HEATMAPS),
 )
 
 
@@ -96,7 +106,9 @@ def _mock_input_monitor(
         }
     )
     m.get_input_sequence.return_value = sequence if sequence is not None else []
-    m.get_key_heatmaps.return_value = heatmaps if heatmaps is not None else {}
+    m.get_key_heatmaps.return_value = (
+        dict(heatmaps) if heatmaps is not None else dict(_HEATMAPS)
+    )
     return m
 
 
@@ -158,6 +170,7 @@ def test_sample_to_dict_includes_new_schema_fields():
     assert d["window_title"] == "VALORANT"
     assert d["hw_recent"] == [_HW_SLOT]
     assert d["input_since_last"] == _INPUT_AGG
+    assert d["key_heatmaps"] == _HEATMAPS
 
 
 def test_sample_to_dict_is_json_serialisable():
@@ -224,6 +237,7 @@ def test_recorder_start_drains_input_monitor(recorder, monitor):
     monitor.get_and_reset_count.assert_called_once()
     monitor.get_and_reset_flicks.assert_called_once()
     monitor.get_and_reset_input_aggregates.assert_called_once()
+    monitor.clear_events.assert_called_once()
 
 
 def test_recorder_start_clears_hw_recent(recorder):

@@ -7,9 +7,13 @@ import pytest
 from src.feature_engineering import (
     TABULAR_DIM,
     _GAMING_KEYS,
+    _HEATMAP_LABELS,
     _HW_RECENT_DEPTH,
     _app_hash_block,
+    _heatmap_block,
+    _heatmap_window_stats,
     _hw_recent_block,
+    _shannon_entropy,
     extract_tabular_features,
 )
 
@@ -50,6 +54,15 @@ _INPUT_AGG = {
     },
 }
 
+_HEATMAPS = {
+    "1s":  {"w": 1},
+    "5s":  {"w": 3, "a": 1},
+    "15s": {"w": 5, "a": 2},
+    "30s": {"w": 8, "a": 3, "space": 1},
+    "1m":  {"w": 12, "a": 5, "space": 2},
+    "3m":  {"w": 20, "a": 9, "space": 4, "shift": 1},
+}
+
 _FULL_SAMPLE = {
     "timestamp": 1000.0,
     "label": "Gaming",
@@ -57,6 +70,7 @@ _FULL_SAMPLE = {
     "window_title": "VALORANT",
     "hw_recent": [_HW_SLOT_A, _HW_SLOT_B],
     "input_since_last": _INPUT_AGG,
+    "key_heatmaps": _HEATMAPS,
 }
 
 
@@ -64,8 +78,8 @@ _FULL_SAMPLE = {
 # TABULAR_DIM constant
 # ---------------------------------------------------------------------------
 
-def test_tabular_dim_is_85():
-    assert TABULAR_DIM == 85
+def test_tabular_dim_is_117():
+    assert TABULAR_DIM == 117
 
 
 def test_block_sizes_sum_to_tabular_dim():
@@ -75,9 +89,10 @@ def test_block_sizes_sum_to_tabular_dim():
     flick_block_size = 5
     gaming_keys_size = len(_GAMING_KEYS)
     app_hash_size = 16
+    heatmap_block_size = len(_HEATMAP_LABELS) * 4 + len(_GAMING_KEYS)
     total = (
         hw_block_size + input_block_size + flick_block_size
-        + gaming_keys_size + app_hash_size
+        + gaming_keys_size + app_hash_size + heatmap_block_size
     )
     assert total == TABULAR_DIM
 
@@ -104,6 +119,7 @@ def test_extract_empty_sample():
         "window_title": "",
         "hw_recent": [],
         "input_since_last": {},
+        "key_heatmaps": {},
     }
     features = extract_tabular_features(sample)
     assert len(features) == TABULAR_DIM
@@ -131,6 +147,14 @@ def test_changing_input_changes_features():
 def test_changing_app_name_changes_features():
     a = dict(_FULL_SAMPLE, app_name="valorant.exe")
     b = dict(_FULL_SAMPLE, app_name="chrome.exe")
+    assert extract_tabular_features(a) != extract_tabular_features(b)
+
+
+def test_changing_heatmaps_changes_features():
+    a = dict(_FULL_SAMPLE)
+    b = dict(_FULL_SAMPLE, key_heatmaps=dict(_HEATMAPS, **{
+        "3m": {"w": 50, "a": 30, "space": 20, "shift": 10},
+    }))
     assert extract_tabular_features(a) != extract_tabular_features(b)
 
 
@@ -194,3 +218,46 @@ def test_app_hash_distinct_apps_likely_differ():
     }
     # 6 inputs × 16 buckets — expect ≥ 4 distinct buckets in practice.
     assert len(distinct) >= 4
+
+
+# ---------------------------------------------------------------------------
+# Heatmap block
+# ---------------------------------------------------------------------------
+
+def test_shannon_entropy_uniform_is_log2_n():
+    counts = {"w": 1, "a": 1, "s": 1, "d": 1}
+    assert _shannon_entropy(counts) == pytest.approx(2.0, abs=1e-6)
+
+
+def test_shannon_entropy_single_key_is_zero():
+    assert _shannon_entropy({"w": 100}) == pytest.approx(0.0, abs=1e-6)
+
+
+def test_shannon_entropy_empty_is_zero():
+    assert _shannon_entropy({}) == 0.0
+
+
+def test_heatmap_window_stats_empty():
+    assert _heatmap_window_stats({}) == [0.0, 0.0, 0.0, 0.0]
+
+
+def test_heatmap_window_stats_shape():
+    stats = _heatmap_window_stats({"w": 3, "a": 1})
+    assert len(stats) == 4
+    assert stats[0] == pytest.approx(math.log1p(4.0), abs=1e-6)  # total
+    assert stats[1] == 2.0                                       # unique
+    assert stats[2] == pytest.approx(math.log1p(3.0), abs=1e-6)  # max
+
+
+def test_heatmap_block_size():
+    block = _heatmap_block({})
+    assert len(block) == len(_HEATMAP_LABELS) * 4 + len(_GAMING_KEYS)
+
+
+def test_heatmap_block_includes_all_windows():
+    block = _heatmap_block({
+        label: {"w": i + 1} for i, label in enumerate(_HEATMAP_LABELS)
+    })
+    # Each window's first stat is log1p(total); total here is i+1.
+    for i in range(len(_HEATMAP_LABELS)):
+        assert block[i * 4] == pytest.approx(math.log1p(i + 1), abs=1e-6)

@@ -38,6 +38,11 @@ class DataSample:
     #    "gaming_keys": {"w","a","s","d","space","shift","left","right"}}
     input_since_last: dict
 
+    # Per-key press frequencies for the standard 1s/5s/15s/30s/1m/3m windows
+    # ending at the sample timestamp. Provides cross-session activity context
+    # that complements the per-tick ``input_since_last``.
+    key_heatmaps: dict
+
     # Visual (excluded from JSON export)
     screenshot: Optional[object] = field(default=None, repr=False)
 
@@ -50,4 +55,5 @@ class DataSample:
             "window_title": self.window_title,
             "hw_recent": self.hw_recent,
             "input_since_last": self.input_since_last,
+            "key_heatmaps": self.key_heatmaps,
         }

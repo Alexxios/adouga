@@ -2,23 +2,27 @@
 
 Layout (deterministic — index-aligned with the model's tabular branch):
 
-  [0:50)   HW recent — 5 slots × 10 fields, oldest first; missing slots are
-           zeroed and ``gpu_present`` already encodes GPU absence.
-  [50:56)  Input counts — key_press / mouse_click / mouse_scroll / mouse_move
-           / total / + 1 reserved slot (currently 0 to keep the dim stable).
-  [56:61)  Flick stats — count, mag_mean, mag_max, dx_mean, dy_mean.
-  [61:69)  Gaming key counts — w, a, s, d, space, shift, left, right.
-  [69:85)  16-bucket SHA-256 indicator over the lower-cased ``app_name``.
+  [0:50)    HW recent — 5 slots × 10 fields, oldest first; missing slots are
+            zeroed and ``gpu_present`` already encodes GPU absence.
+  [50:56)   Input counts — key_press / mouse_click / mouse_scroll / mouse_move
+            / total / + 1 reserved slot (currently 0 to keep the dim stable).
+  [56:61)   Flick stats — count, mag_mean, mag_max, dx_mean, dy_mean.
+  [61:69)   Gaming key counts (this tick) — w, a, s, d, space, shift, left, right.
+  [69:85)   16-bucket SHA-256 indicator over the lower-cased ``app_name``.
+  [85:109)  Key-heatmap window stats — 6 windows (1s/5s/15s/30s/1m/3m) ×
+            (total, unique, max, entropy).
+  [109:117) 3m-window gaming-key counts — same key order as the per-tick block.
 
-Heavy-tailed quantities (disk bps, all input counts, flick magnitudes) are
-``log1p``-transformed at extraction time so the tabular branch sees the
-same scales it will see in production. Empty / missing fields → zeros.
+Heavy-tailed quantities (disk bps, all input counts, flick magnitudes,
+heatmap totals/maxes) are ``log1p``-transformed at extraction time so the
+tabular branch sees the same scales it will see in production. Empty /
+missing fields → zeros.
 """
 
 import hashlib
 import math
 
-TABULAR_DIM = 85
+TABULAR_DIM = 117
 
 _HW_RECENT_DEPTH = 5
 _HW_FIELDS: tuple[tuple[str, bool], ...] = (
@@ -40,6 +44,10 @@ _GAMING_KEYS: tuple[str, ...] = (
     "w", "a", "s", "d", "space", "shift", "left", "right",
 )
 _APP_HASH_BUCKETS = 16
+
+# Order of heatmap windows fed to the tabular branch. Must match the keys
+# emitted by InputMonitor.get_key_heatmaps().
+_HEATMAP_LABELS: tuple[str, ...] = ("1s", "5s", "15s", "30s", "1m", "3m")
 
 
 def _safe_float(val) -> float:
@@ -122,6 +130,42 @@ def _app_hash_block(app_name: str) -> list[float]:
     return out
 
 
+def _shannon_entropy(counts: dict) -> float:
+    """Shannon entropy (bits) of a ``{key: count}`` dict; 0 on empty input."""
+    total = sum(counts.values())
+    if total <= 0:
+        return 0.0
+    ent = 0.0
+    for c in counts.values():
+        if c > 0:
+            p = c / total
+            ent -= p * math.log2(p)
+    return ent
+
+
+def _heatmap_window_stats(window: dict) -> list[float]:
+    """4 features per window: log1p(total), unique, log1p(max), entropy."""
+    if not window:
+        return [0.0, 0.0, 0.0, 0.0]
+    values = [int(v) for v in window.values()]
+    total = float(sum(values))
+    unique = float(len(window))
+    mx = float(max(values))
+    ent = _shannon_entropy(window)
+    return [math.log1p(total), unique, math.log1p(mx), ent]
+
+
+def _heatmap_block(key_heatmaps: dict) -> list[float]:
+    """6 windows × 4 stats + 8 gaming-key counts from the 3m window = 32 floats."""
+    out: list[float] = []
+    for label in _HEATMAP_LABELS:
+        out.extend(_heatmap_window_stats((key_heatmaps or {}).get(label) or {}))
+    window_3m = (key_heatmaps or {}).get("3m") or {}
+    for key in _GAMING_KEYS:
+        out.append(math.log1p(max(0.0, _safe_float(window_3m.get(key)))))
+    return out
+
+
 def extract_tabular_features(sample: dict) -> list[float]:
     """Convert one sample dict to a flat list of ``TABULAR_DIM`` floats.
 
@@ -142,6 +186,7 @@ def extract_tabular_features(sample: dict) -> list[float]:
     features.extend(_flick_block(sample.get("input_since_last", {})))
     features.extend(_gaming_keys_block(sample.get("input_since_last", {})))
     features.extend(_app_hash_block(sample.get("app_name", "")))
+    features.extend(_heatmap_block(sample.get("key_heatmaps", {})))
 
     assert len(features) == TABULAR_DIM, (
         f"Expected {TABULAR_DIM} features, got {len(features)}"

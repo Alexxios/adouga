@@ -50,6 +50,14 @@ def _make_sample_dict(timestamp: float = 1000.0, label: str = "Gaming") -> dict:
                 "space": 0, "shift": 0, "left": 0, "right": 0,
             },
         },
+        "key_heatmaps": {
+            "1s":  {"w": 1},
+            "5s":  {"w": 3, "a": 1},
+            "15s": {"w": 5, "a": 2},
+            "30s": {"w": 8, "a": 3, "space": 1},
+            "1m":  {"w": 12, "a": 5, "space": 2},
+            "3m":  {"w": 20, "a": 9, "space": 4, "shift": 1},
+        },
     }
 
 

@@ -173,6 +173,16 @@ class InputMonitor:
             self._flicks.clear()
         return flicks
 
+    def clear_events(self) -> None:
+        """Drop the entire raw event log.
+
+        Called by the recorder on ``start()`` so the first sample's
+        ``key_heatmaps`` doesn't include key presses that occurred before
+        recording began.
+        """
+        with self._lock:
+            self._events.clear()
+
     def get_and_reset_input_aggregates(self) -> dict:
         """Return per-sample input aggregates and reset all per-type counters.
 
