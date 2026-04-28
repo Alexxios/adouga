@@ -6,24 +6,37 @@ from typing import Optional
 
 @dataclass
 class DataSample:
-    """Single time-stamped data point captured during recording."""
+    """Single time-stamped data point captured during recording.
+
+    All time-series fields are aligned to *this* sample (no session-rolling
+    deques). ``hw_recent`` carries the last few hardware snapshots (one per
+    capture tick), and ``input_since_last`` aggregates input events that
+    occurred between the previous capture and this one.
+    """
 
     timestamp: float
     label: str
 
-    # Hardware histories — rolling 3-min time series from HardwareMonitor
-    cpu_history: list   # [{"timestamp", "percent", "freq_ghz"}, ...]
-    ram_history: list   # [{"timestamp", "percent", "used_gb", "total_gb"}, ...]
-    gpu_history: list   # [{"timestamp", "load_percent", "memory_used_gb", ...}, ...]
-    disk_history: list  # [{"timestamp", "read_bps", "write_bps"}, ...]
+    # Foreground app metadata (empty strings when unavailable).
+    app_name: str
+    window_title: str
 
-    # Input aggregate (since last sample)
-    input_count: int
-    flick_vectors: list  # [(dx, dy), ...]
+    # Last N hardware snapshots, oldest first. Each entry is a dict with
+    # the keys produced by HardwareMonitor (cpu/ram/gpu/disk merged):
+    #   {"cpu_percent", "cpu_freq_ghz", "ram_percent", "ram_used_gb",
+    #    "gpu_load_percent", "gpu_memory_used_gb", "gpu_temperature_c",
+    #    "gpu_present", "disk_read_bps", "disk_write_bps"}
+    # Cold-start padding entries are empty dicts.
+    hw_recent: list
 
-    # Input detail — rolling 3-min window
-    input_sequence: list  # [{"timestamp", "type", "value"}, ...]
-    key_heatmaps: dict    # {"1s": {key: count}, "5s": ..., ...}
+    # Input aggregates strictly since the previous sample tick.
+    # Shape:
+    #   {"key_press_count", "mouse_click_count", "mouse_scroll_count",
+    #    "mouse_move_count", "total_count",
+    #    "flick_count", "flick_mag_mean", "flick_mag_max",
+    #    "flick_dx_mean", "flick_dy_mean",
+    #    "gaming_keys": {"w","a","s","d","space","shift","left","right"}}
+    input_since_last: dict
 
     # Visual (excluded from JSON export)
     screenshot: Optional[object] = field(default=None, repr=False)
@@ -33,12 +46,8 @@ class DataSample:
         return {
             "timestamp": self.timestamp,
             "label": self.label,
-            "cpu_history": self.cpu_history,
-            "ram_history": self.ram_history,
-            "gpu_history": self.gpu_history,
-            "disk_history": self.disk_history,
-            "input_count": self.input_count,
-            "flick_vectors": self.flick_vectors,
-            "input_sequence": self.input_sequence,
-            "key_heatmaps": self.key_heatmaps,
+            "app_name": self.app_name,
+            "window_title": self.window_title,
+            "hw_recent": self.hw_recent,
+            "input_since_last": self.input_since_last,
         }

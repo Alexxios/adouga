@@ -1,24 +1,15 @@
 """Rolling-buffer data recorder for ML training data collection.
 
 Captures screenshots and input metrics at a fixed interval, retaining the
-last ``window_seconds`` of samples.  Hardware stats (CPU, RAM, GPU, disk) are
-provided as rolling time-series by :class:`HardwareMonitor` and attached to
-each sample as-is, giving every training example its full 3-minute context.
+last ``window_seconds`` of samples. Each sample carries:
+
+* ``app_name`` / ``window_title`` — foreground app metadata
+* ``hw_recent``       — last N=5 per-sample-aligned HW snapshots (oldest first)
+* ``input_since_last``— input aggregates strictly since the previous tick
+* ``screenshot``      — PIL image of the active window (excluded from JSON)
 
 Call :meth:`export_zip` to package the current buffer as a labelled ZIP
 archive ready for upload.
-
-Per-sample contents
--------------------
-* ``cpu_history``      — [{timestamp, percent, freq_ghz}, ...]
-* ``ram_history``      — [{timestamp, percent, used_gb, total_gb}, ...]
-* ``gpu_history``      — [{timestamp, load_percent, memory_used_gb, ...}, ...]
-* ``disk_history``     — [{timestamp, read_bps, write_bps}, ...]
-* ``input_count``      — keyboard + mouse events since the last sample
-* ``flick_vectors``    — significant mouse-movement vectors
-* ``input_sequence``   — timestamped raw event log (last 3 min)
-* ``key_heatmaps``     — per-key frequency dicts for 1s/5s/15s/30s/1m/3m windows
-* ``screenshot``       — PIL image of the active window (excluded from JSON)
 """
 
 import io
@@ -33,13 +24,18 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from src.core.models import DataSample
+from src.core.sample_builders import (
+    build_input_since_last,
+    flatten_hw_latest,
+)
 from src.core.screenshot import take_screenshot
-from src.core.window import get_active_window_rect
+from src.core.window import get_active_window_info
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_WINDOW_SECONDS = 180
-_DEFAULT_SAMPLE_INTERVAL = 0.5
+_DEFAULT_SAMPLE_INTERVAL = 1.0
+_HW_RECENT_DEPTH = 5
 
 class DataRecorder:
     """Continuously captures labelled samples into a fixed-size rolling buffer.
@@ -75,6 +71,7 @@ class DataRecorder:
         self._max_samples = max(1, int(window_seconds / sample_interval))
 
         self._samples: deque = deque(maxlen=self._max_samples)
+        self._hw_recent: deque = deque(maxlen=_HW_RECENT_DEPTH)
         self._current_label: str = ""
         self._recording: bool = False
         self._lock = threading.Lock()
@@ -133,11 +130,38 @@ class DataRecorder:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        """Begin periodic capture.  No-op if already recording."""
+        """Begin periodic capture.  No-op if already recording.
+
+        Drains the input monitor's pre-launch accumulators so the very
+        first sample only reflects events captured during the recording
+        window, and clears the per-sample HW snapshot buffer.
+        """
         if self._recording:
             logger.warning("start() called while already recording — ignored")
             return
         logger.info("Recording started")
+
+        # Drain pre-launch accumulators on the input monitor — otherwise the
+        # first sample is poisoned by everything that happened since the app
+        # was launched.
+        try:
+            self._input_monitor.get_and_reset_count()
+        except Exception:
+            logger.debug("get_and_reset_count drain failed", exc_info=True)
+        if hasattr(self._input_monitor, "get_and_reset_flicks"):
+            try:
+                self._input_monitor.get_and_reset_flicks()
+            except Exception:
+                logger.debug("get_and_reset_flicks drain failed", exc_info=True)
+        if hasattr(self._input_monitor, "get_and_reset_input_aggregates"):
+            try:
+                self._input_monitor.get_and_reset_input_aggregates()
+            except Exception:
+                logger.debug(
+                    "get_and_reset_input_aggregates drain failed", exc_info=True,
+                )
+        self._hw_recent.clear()
+
         self._recording = True
         if self._first_capture_delay > 0:
             logger.info("Delaying first capture by %.1fs", self._first_capture_delay)
@@ -281,39 +305,28 @@ class DataRecorder:
         try:
             timestamp = time.time()
 
-            # Hardware histories
-            cpu_history  = self._hw.get_cpu_history()  if self._hw else []
-            ram_history  = self._hw.get_ram_history()  if self._hw else []
-            gpu_history  = self._hw.get_gpu_history()  if self._hw else []
-            disk_history = self._hw.get_disk_history() if self._hw else []
-
-            # Input
-            input_count     = self._input_monitor.get_and_reset_count()
-            flicks          = self._input_monitor.get_flicks()
-            input_sequence  = (
-                self._input_monitor.get_input_sequence()
-                if hasattr(self._input_monitor, "get_input_sequence") else []
+            # Per-sample HW snapshot — append now, then carry the last N.
+            hw_snapshot = flatten_hw_latest(
+                self._hw.get_latest() if self._hw else {},
+                timestamp,
             )
-            key_heatmaps    = (
-                self._input_monitor.get_key_heatmaps()
-                if hasattr(self._input_monitor, "get_key_heatmaps") else {}
-            )
+            self._hw_recent.append(hw_snapshot)
+            hw_recent = list(self._hw_recent)
 
-            # Screenshot
-            rect       = get_active_window_rect()
+            # Input — drain so each sample reflects only this 1s window.
+            input_since_last = build_input_since_last(self._input_monitor)
+
+            # Foreground window
+            rect, app_name, window_title = get_active_window_info()
             screenshot = take_screenshot(rect) if rect else None
 
             sample = DataSample(
                 timestamp=timestamp,
                 label=self._current_label,
-                cpu_history=cpu_history,
-                ram_history=ram_history,
-                gpu_history=gpu_history,
-                disk_history=disk_history,
-                input_count=input_count,
-                flick_vectors=list(flicks),
-                input_sequence=input_sequence,
-                key_heatmaps=key_heatmaps,
+                app_name=app_name,
+                window_title=window_title,
+                hw_recent=hw_recent,
+                input_since_last=input_since_last,
                 screenshot=screenshot,
             )
 
@@ -336,12 +349,10 @@ class DataRecorder:
                 ).start()
 
             logger.debug(
-                "Sample captured — label=%r cpu_pts=%d ram_pts=%d "
-                "gpu_pts=%d disk_pts=%d inputs=%d seq=%d screenshot=%s",
-                self._current_label,
-                len(cpu_history), len(ram_history),
-                len(gpu_history), len(disk_history),
-                input_count, len(input_sequence),
+                "Sample captured — label=%r app=%r hw_pts=%d inputs=%d screenshot=%s",
+                self._current_label, app_name,
+                len(hw_recent),
+                input_since_last["total_count"],
                 "ok" if screenshot else "none",
             )
 

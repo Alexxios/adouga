@@ -6,11 +6,14 @@ import tkinter as tk
 from collections import deque
 
 from src.core.models import DataSample
-from src.core.window import get_active_window_rect
+from src.core.window import get_active_window_info
 from src.core.hardware_monitor import HardwareMonitor
 from src.core.input_monitor import InputMonitor
 from src.core.theme import ModernTheme
 from src.core.screenshot import take_screenshot
+from src.core.sample_builders import build_input_since_last, flatten_hw_latest
+
+_USER_APP_HW_RECENT_DEPTH = 5
 from src.app.ui.monitor_page import MonitorPage
 from src.app.ui.ai_page import AIPage
 from src.app.ui.distributions_page import DistributionsPage
@@ -28,6 +31,8 @@ class SystemMonitorApp(tk.Tk):
         self.history_len = 30
         # Rich sample buffer (matching dev app's DataSample)
         self._samples: deque = deque(maxlen=self.history_len)
+        # Per-sample-aligned HW snapshot ring, last N=5 ticks
+        self._hw_recent: deque = deque(maxlen=_USER_APP_HW_RECENT_DEPTH)
         # Legacy deques for MonitorPage graphs
         self.cpu_data = deque([0]*self.history_len, maxlen=self.history_len)
         self.ram_data = deque([0]*self.history_len, maxlen=self.history_len)
@@ -125,49 +130,41 @@ class SystemMonitorApp(tk.Tk):
     def loop(self):
         timestamp = _time.time()
 
-        # 1. Hardware histories from HardwareMonitor
-        cpu_history = self.hw_monitor.get_cpu_history() if self.hw_monitor else []
-        ram_history = self.hw_monitor.get_ram_history() if self.hw_monitor else []
-        gpu_history = self.hw_monitor.get_gpu_history() if self.hw_monitor else []
-        disk_history = self.hw_monitor.get_disk_history() if self.hw_monitor else []
+        # 1. Per-sample-aligned HW snapshot
+        hw_snapshot = flatten_hw_latest(
+            self.hw_monitor.get_latest() if self.hw_monitor else {},
+            timestamp,
+        )
+        self._hw_recent.append(hw_snapshot)
 
-        # 2. Input data
-        input_count = 0
-        flick_vectors = []
-        input_sequence = []
-        key_heatmaps = {}
+        # 2. Input aggregates since last tick
         if self.input_monitor:
-            input_count = self.input_monitor.get_and_reset_count()
-            flick_vectors = self.input_monitor.get_flicks()
-            input_sequence = self.input_monitor.get_input_sequence()
-            key_heatmaps = self.input_monitor.get_key_heatmaps()
+            input_since_last = build_input_since_last(self.input_monitor)
+        else:
+            input_since_last = build_input_since_last(object())
 
-        # 3. Capture Screen
-        rect = get_active_window_rect()
-        self.current_image = take_screenshot(rect)
+        # 3. Foreground window + screenshot
+        rect, app_name, window_title = get_active_window_info()
+        self.current_image = take_screenshot(rect) if rect else None
 
         # 4. Build DataSample (matching dev app structure)
         sample = DataSample(
             timestamp=timestamp,
             label="",
-            cpu_history=cpu_history,
-            ram_history=ram_history,
-            gpu_history=gpu_history,
-            disk_history=disk_history,
-            input_count=input_count,
-            flick_vectors=list(flick_vectors),
-            input_sequence=input_sequence,
-            key_heatmaps=key_heatmaps,
+            app_name=app_name,
+            window_title=window_title,
+            hw_recent=list(self._hw_recent),
+            input_since_last=input_since_last,
             screenshot=self.current_image,
         )
         self._samples.append(sample)
 
         # 5. Populate legacy deques for MonitorPage graphs
-        latest_cpu = cpu_history[-1]["percent"] if cpu_history else 0
-        latest_ram = ram_history[-1]["percent"] if ram_history else 0
-        self.cpu_data.append(float(latest_cpu))
-        self.ram_data.append(float(latest_ram))
-        self.input_data.append(input_count)
+        cpu_pct = hw_snapshot.get("cpu_percent") or 0
+        ram_pct = hw_snapshot.get("ram_percent") or 0
+        self.cpu_data.append(float(cpu_pct))
+        self.ram_data.append(float(ram_pct))
+        self.input_data.append(input_since_last["total_count"])
 
         # 6. Update UI
         self.frames[self.curr_page].update_view()

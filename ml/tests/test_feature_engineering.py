@@ -6,55 +6,57 @@ import pytest
 
 from src.feature_engineering import (
     TABULAR_DIM,
-    _heatmap_stats,
-    _shannon_entropy,
-    _stats,
+    _GAMING_KEYS,
+    _HW_RECENT_DEPTH,
+    _app_hash_block,
+    _hw_recent_block,
     extract_tabular_features,
 )
 
 
 # ---------------------------------------------------------------------------
-# Fixtures / helpers
+# Fixtures
 # ---------------------------------------------------------------------------
 
-_CPU_HIST = [
-    {"timestamp": 1.0, "percent": 20.0, "freq_ghz": 3.0},
-    {"timestamp": 2.0, "percent": 40.0, "freq_ghz": 3.5},
-    {"timestamp": 3.0, "percent": 60.0, "freq_ghz": 3.2},
-]
-_RAM_HIST = [
-    {"timestamp": 1.0, "percent": 50.0, "used_gb": 8.0, "total_gb": 16.0},
-    {"timestamp": 2.0, "percent": 55.0, "used_gb": 8.8, "total_gb": 16.0},
-]
-_GPU_HIST = [
-    {"timestamp": 1.0, "load_percent": 70.0, "memory_used_gb": 4.0,
-     "memory_total_gb": 8.0, "temperature_c": 65},
-]
-_DISK_HIST = [
-    {"timestamp": 1.0, "read_bps": 1024.0, "write_bps": 512.0},
-    {"timestamp": 2.0, "read_bps": 2048.0, "write_bps": 1024.0},
-]
-_SEQ = [
-    {"timestamp": 999.0, "type": "key_press", "value": "a"},
-    {"timestamp": 999.5, "type": "mouse_click", "value": "left"},
-    {"timestamp": 999.8, "type": "mouse_scroll", "value": "scroll_up"},
-]
-_HEATMAPS = {
-    "1s": {"a": 1}, "5s": {"a": 3}, "15s": {"a": 5},
-    "30s": {"a": 8}, "1m": {"a": 12}, "3m": {"a": 20, "left": 5},
+_HW_SLOT_A = {
+    "timestamp": 1.0,
+    "cpu_percent": 25.0,
+    "cpu_freq_ghz": 3.5,
+    "ram_percent": 60.0,
+    "ram_used_gb": 8.0,
+    "gpu_present": 1,
+    "gpu_load_percent": 70.0,
+    "gpu_memory_used_gb": 4.0,
+    "gpu_temperature_c": 65,
+    "disk_read_bps": 1024.0,
+    "disk_write_bps": 512.0,
+}
+_HW_SLOT_B = dict(_HW_SLOT_A, timestamp=2.0, cpu_percent=80.0, disk_read_bps=4096.0)
+
+_INPUT_AGG = {
+    "key_press_count": 5,
+    "mouse_click_count": 1,
+    "mouse_scroll_count": 0,
+    "mouse_move_count": 12,
+    "total_count": 18,
+    "flick_count": 2,
+    "flick_mag_mean": 22.36,
+    "flick_mag_max": 30.0,
+    "flick_dx_mean": 5.0,
+    "flick_dy_mean": 7.5,
+    "gaming_keys": {
+        "w": 4, "a": 0, "s": 1, "d": 0,
+        "space": 2, "shift": 0, "left": 0, "right": 0,
+    },
 }
 
 _FULL_SAMPLE = {
     "timestamp": 1000.0,
     "label": "Gaming",
-    "cpu_history": _CPU_HIST,
-    "ram_history": _RAM_HIST,
-    "gpu_history": _GPU_HIST,
-    "disk_history": _DISK_HIST,
-    "input_count": 7,
-    "flick_vectors": [(10, 20), (-5, 15)],
-    "input_sequence": _SEQ,
-    "key_heatmaps": _HEATMAPS,
+    "app_name": "valorant.exe",
+    "window_title": "VALORANT",
+    "hw_recent": [_HW_SLOT_A, _HW_SLOT_B],
+    "input_since_last": _INPUT_AGG,
 }
 
 
@@ -62,66 +64,26 @@ _FULL_SAMPLE = {
 # TABULAR_DIM constant
 # ---------------------------------------------------------------------------
 
-def test_tabular_dim_is_102():
-    assert TABULAR_DIM == 102
+def test_tabular_dim_is_85():
+    assert TABULAR_DIM == 85
+
+
+def test_block_sizes_sum_to_tabular_dim():
+    """Sanity check the layout invariant in case any block size drifts."""
+    hw_block_size = _HW_RECENT_DEPTH * 10
+    input_block_size = 6
+    flick_block_size = 5
+    gaming_keys_size = len(_GAMING_KEYS)
+    app_hash_size = 16
+    total = (
+        hw_block_size + input_block_size + flick_block_size
+        + gaming_keys_size + app_hash_size
+    )
+    assert total == TABULAR_DIM
 
 
 # ---------------------------------------------------------------------------
-# _stats helper
-# ---------------------------------------------------------------------------
-
-def test_stats_empty_returns_zeros():
-    assert _stats([]) == [0.0] * 5
-
-
-def test_stats_single_value():
-    result = _stats([42.0])
-    assert result == [42.0, 0.0, 42.0, 42.0, 42.0]
-
-
-def test_stats_multiple_values():
-    result = _stats([10.0, 20.0, 30.0])
-    assert result[0] == pytest.approx(20.0)       # mean
-    assert result[1] == pytest.approx(8.165, abs=0.01)  # std
-    assert result[2] == 10.0                       # min
-    assert result[3] == 30.0                       # max
-    assert result[4] == 30.0                       # last
-
-
-# ---------------------------------------------------------------------------
-# _shannon_entropy
-# ---------------------------------------------------------------------------
-
-def test_entropy_single_key_is_zero():
-    assert _shannon_entropy({"a": 10}) == 0.0
-
-
-def test_entropy_uniform_two_keys():
-    ent = _shannon_entropy({"a": 5, "b": 5})
-    assert ent == pytest.approx(1.0, abs=0.001)
-
-
-def test_entropy_empty_is_zero():
-    assert _shannon_entropy({}) == 0.0
-
-
-# ---------------------------------------------------------------------------
-# _heatmap_stats
-# ---------------------------------------------------------------------------
-
-def test_heatmap_stats_length():
-    result = _heatmap_stats(_HEATMAPS)
-    assert len(result) == 32  # 6 * 4 + 8
-
-
-def test_heatmap_stats_empty():
-    result = _heatmap_stats({})
-    assert len(result) == 32
-    assert all(v == 0.0 for v in result)
-
-
-# ---------------------------------------------------------------------------
-# extract_tabular_features — full sample
+# extract_tabular_features — shape + finiteness
 # ---------------------------------------------------------------------------
 
 def test_extract_full_sample_length():
@@ -134,56 +96,101 @@ def test_extract_full_sample_all_finite():
     assert all(math.isfinite(f) for f in features)
 
 
-# ---------------------------------------------------------------------------
-# extract_tabular_features — empty histories
-# ---------------------------------------------------------------------------
-
-def test_extract_empty_histories():
+def test_extract_empty_sample():
     sample = {
         "timestamp": 1000.0,
         "label": "Not Gaming",
-        "cpu_history": [],
-        "ram_history": [],
-        "gpu_history": [],
-        "disk_history": [],
-        "input_count": 0,
-        "flick_vectors": [],
-        "input_sequence": [],
-        "key_heatmaps": {},
+        "app_name": "",
+        "window_title": "",
+        "hw_recent": [],
+        "input_since_last": {},
     }
     features = extract_tabular_features(sample)
     assert len(features) == TABULAR_DIM
     assert all(math.isfinite(f) for f in features)
+    assert all(f == 0.0 for f in features)
 
 
-def test_extract_missing_gpu_flag_is_zero():
-    sample = {
-        "cpu_history": _CPU_HIST,
-        "ram_history": _RAM_HIST,
-        "gpu_history": [],
-        "disk_history": _DISK_HIST,
-        "input_count": 5,
-        "flick_vectors": [],
-        "input_sequence": [],
-        "key_heatmaps": {},
+# ---------------------------------------------------------------------------
+# Per-sample discrimination — the bug-fix invariant
+# ---------------------------------------------------------------------------
+
+def test_changing_hw_changes_features():
+    """Two consecutive samples with different HW must produce different vectors."""
+    a = dict(_FULL_SAMPLE, hw_recent=[_HW_SLOT_A])
+    b = dict(_FULL_SAMPLE, hw_recent=[_HW_SLOT_B])
+    assert extract_tabular_features(a) != extract_tabular_features(b)
+
+
+def test_changing_input_changes_features():
+    a = dict(_FULL_SAMPLE)
+    b = dict(_FULL_SAMPLE, input_since_last=dict(_INPUT_AGG, total_count=999))
+    assert extract_tabular_features(a) != extract_tabular_features(b)
+
+
+def test_changing_app_name_changes_features():
+    a = dict(_FULL_SAMPLE, app_name="valorant.exe")
+    b = dict(_FULL_SAMPLE, app_name="chrome.exe")
+    assert extract_tabular_features(a) != extract_tabular_features(b)
+
+
+# ---------------------------------------------------------------------------
+# HW recent block — padding and ordering
+# ---------------------------------------------------------------------------
+
+def test_hw_recent_block_pads_when_short():
+    block = _hw_recent_block([_HW_SLOT_A])
+    assert len(block) == _HW_RECENT_DEPTH * 10
+    # First (depth-1) slots are the cold-start zero pad.
+    pad_len = (_HW_RECENT_DEPTH - 1) * 10
+    assert all(v == 0.0 for v in block[:pad_len])
+    # Newest slot is at the end and reflects _HW_SLOT_A.
+    assert block[pad_len + 0] == 25.0  # cpu_percent
+
+
+def test_hw_recent_block_truncates_when_too_long():
+    long_recent = [_HW_SLOT_A] * (_HW_RECENT_DEPTH + 3)
+    block = _hw_recent_block(long_recent)
+    assert len(block) == _HW_RECENT_DEPTH * 10
+
+
+def test_hw_recent_block_log1p_on_disk_bps():
+    block = _hw_recent_block([_HW_SLOT_A])
+    pad_len = (_HW_RECENT_DEPTH - 1) * 10
+    # disk_read_bps is field index 8 within a slot.
+    assert block[pad_len + 8] == pytest.approx(math.log1p(1024.0), abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# App-hash block
+# ---------------------------------------------------------------------------
+
+def test_app_hash_empty_string_is_all_zeros():
+    block = _app_hash_block("")
+    assert block == [0.0] * 16
+
+
+def test_app_hash_one_hot_indicator():
+    block = _app_hash_block("valorant.exe")
+    assert sum(block) == 1.0
+    assert all(v in (0.0, 1.0) for v in block)
+
+
+def test_app_hash_is_case_insensitive():
+    assert _app_hash_block("Valorant.EXE") == _app_hash_block("valorant.exe")
+
+
+def test_app_hash_strips_whitespace():
+    assert _app_hash_block("  valorant.exe  ") == _app_hash_block("valorant.exe")
+
+
+def test_app_hash_distinct_apps_likely_differ():
+    """Different app names should usually land in different buckets."""
+    distinct = {
+        tuple(_app_hash_block(name)) for name in (
+            "valorant.exe", "chrome.exe", "rocket league.exe",
+            "miro", "twitch.tv", "wuthering waves",
+        )
     }
-    features = extract_tabular_features(sample)
-    # GPU: 10 (cpu) + 15 (ram) + 20 (gpu stats) = index 45 is gpu_available flag
-    assert features[45] == 0.0
-
-
-def test_extract_present_gpu_flag_is_one():
-    features = extract_tabular_features(_FULL_SAMPLE)
-    assert features[45] == 1.0
-
-
-# ---------------------------------------------------------------------------
-# extract_tabular_features — None freq_ghz
-# ---------------------------------------------------------------------------
-
-def test_extract_none_freq_ghz():
-    sample = dict(_FULL_SAMPLE)
-    sample["cpu_history"] = [{"timestamp": 1.0, "percent": 30.0, "freq_ghz": None}]
-    features = extract_tabular_features(sample)
-    assert len(features) == TABULAR_DIM
-    assert math.isfinite(features[5])  # freq_ghz mean position
+    # 6 inputs × 16 buckets — expect ≥ 4 distinct buckets in practice.
+    assert len(distinct) >= 4

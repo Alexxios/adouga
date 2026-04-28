@@ -1,138 +1,129 @@
-"""Convert a raw DataSample dict into a fixed-size feature vector for the tabular branch.
+"""Convert a per-sample DataSample dict into a fixed-size feature vector.
 
-The feature vector has ``TABULAR_DIM`` floats and is built from hardware histories,
-input statistics, flick vectors, input sequences and key-press heatmaps.
+Layout (deterministic — index-aligned with the model's tabular branch):
 
-Each variable-length history is reduced to five summary statistics per numeric
-field: *mean, std, min, max, last*.  Empty histories produce zeros.
+  [0:50)   HW recent — 5 slots × 10 fields, oldest first; missing slots are
+           zeroed and ``gpu_present`` already encodes GPU absence.
+  [50:56)  Input counts — key_press / mouse_click / mouse_scroll / mouse_move
+           / total / + 1 reserved slot (currently 0 to keep the dim stable).
+  [56:61)  Flick stats — count, mag_mean, mag_max, dx_mean, dy_mean.
+  [61:69)  Gaming key counts — w, a, s, d, space, shift, left, right.
+  [69:85)  16-bucket SHA-256 indicator over the lower-cased ``app_name``.
+
+Heavy-tailed quantities (disk bps, all input counts, flick magnitudes) are
+``log1p``-transformed at extraction time so the tabular branch sees the
+same scales it will see in production. Empty / missing fields → zeros.
 """
 
-import logging
+import hashlib
 import math
 
-logger = logging.getLogger(__name__)
+TABULAR_DIM = 85
 
-TABULAR_DIM = 102
+_HW_RECENT_DEPTH = 5
+_HW_FIELDS: tuple[tuple[str, bool], ...] = (
+    # (field, log1p_transform)
+    ("cpu_percent",        False),
+    ("cpu_freq_ghz",       False),
+    ("ram_percent",        False),
+    ("ram_used_gb",        False),
+    ("gpu_present",        False),
+    ("gpu_load_percent",   False),
+    ("gpu_memory_used_gb", False),
+    ("gpu_temperature_c",  False),
+    ("disk_read_bps",      True),
+    ("disk_write_bps",     True),
+)
+assert len(_HW_FIELDS) == 10  # noqa: PLR2004 — schema invariant
 
-# Keys we watch for in the 3-minute heatmap window.
-_GAMING_KEYS = ("w", "a", "s", "d", "space", "shift", "left", "right")
+_GAMING_KEYS: tuple[str, ...] = (
+    "w", "a", "s", "d", "space", "shift", "left", "right",
+)
+_APP_HASH_BUCKETS = 16
 
-# Ordered heatmap window labels (must match InputMonitor output).
-_HEATMAP_LABELS = ("1s", "5s", "15s", "30s", "1m", "3m")
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _safe_float(val) -> float:
-    """Coerce *val* to float, treating ``None`` as 0.0."""
+    """Coerce *val* to float; ``None`` and unparseable values become 0.0."""
     if val is None:
         return 0.0
-    return float(val)
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return 0.0
 
 
-def _stats(values: list[float]) -> list[float]:
-    """Return [mean, std, min, max, last] for a non-empty list, or 5 zeros."""
-    if not values:
-        return [0.0] * 5
-    n = len(values)
-    mean = sum(values) / n
-    var = sum((v - mean) ** 2 for v in values) / n
-    return [mean, math.sqrt(var), min(values), max(values), values[-1]]
+def _hw_slot(entry: dict) -> list[float]:
+    """Encode a single HW snapshot dict into 10 floats (per ``_HW_FIELDS``)."""
+    out: list[float] = []
+    for field, use_log1p in _HW_FIELDS:
+        v = _safe_float(entry.get(field))
+        if use_log1p:
+            v = math.log1p(max(0.0, v))
+        out.append(v)
+    return out
 
 
-def _history_stats(entries: list[dict], fields: list[str]) -> list[float]:
-    """Extract per-field summary statistics from a list of history dicts.
+def _hw_recent_block(hw_recent: list) -> list[float]:
+    """Pad/truncate to exactly ``_HW_RECENT_DEPTH`` slots, oldest first."""
+    entries = hw_recent or []
+    if len(entries) > _HW_RECENT_DEPTH:
+        entries = entries[-_HW_RECENT_DEPTH:]
+    out: list[float] = []
+    pad = _HW_RECENT_DEPTH - len(entries)
+    for _ in range(pad):
+        out.extend([0.0] * len(_HW_FIELDS))
+    for entry in entries:
+        out.extend(_hw_slot(entry if isinstance(entry, dict) else {}))
+    return out
 
-    Returns ``5 * len(fields)`` floats.
-    """
-    result: list[float] = []
-    for field in fields:
-        vals = [_safe_float(e.get(field)) for e in entries]
-        result.extend(_stats(vals))
-    return result
+
+def _input_block(input_since_last: dict) -> list[float]:
+    """6 input counts (log1p-transformed) — last slot reserved for layout stability."""
+    src = input_since_last or {}
+    counts = [
+        _safe_float(src.get("key_press_count")),
+        _safe_float(src.get("mouse_click_count")),
+        _safe_float(src.get("mouse_scroll_count")),
+        _safe_float(src.get("mouse_move_count")),
+        _safe_float(src.get("total_count")),
+    ]
+    return [math.log1p(max(0.0, v)) for v in counts] + [0.0]
 
 
-def _flick_stats(flick_vectors: list) -> list[float]:
-    """Return 8 features from flick vectors: count, mag stats, dx/dy stats."""
-    if not flick_vectors:
-        return [0.0] * 8
-    dxs = [float(f[0]) for f in flick_vectors]
-    dys = [float(f[1]) for f in flick_vectors]
-    mags = [math.sqrt(dx * dx + dy * dy) for dx, dy in zip(dxs, dys)]
-    n = len(mags)
-    mean_mag = sum(mags) / n
-    var_mag = sum((m - mean_mag) ** 2 for m in mags) / n
-    mean_dx = sum(dxs) / n
-    mean_dy = sum(dys) / n
-    var_dx = sum((d - mean_dx) ** 2 for d in dxs) / n
-    var_dy = sum((d - mean_dy) ** 2 for d in dys) / n
+def _flick_block(input_since_last: dict) -> list[float]:
+    """5 flick stats; counts/magnitudes pass through log1p."""
+    src = input_since_last or {}
     return [
-        float(n),
-        mean_mag,
-        math.sqrt(var_mag),
-        max(mags),
-        mean_dx,
-        mean_dy,
-        math.sqrt(var_dx),
-        math.sqrt(var_dy),
+        math.log1p(max(0.0, _safe_float(src.get("flick_count")))),
+        math.log1p(max(0.0, _safe_float(src.get("flick_mag_mean")))),
+        math.log1p(max(0.0, _safe_float(src.get("flick_mag_max")))),
+        _safe_float(src.get("flick_dx_mean")),
+        _safe_float(src.get("flick_dy_mean")),
     ]
 
 
-def _sequence_stats(input_sequence: list[dict]) -> list[float]:
-    """Return 5 features: per-type counts, total, events/sec."""
-    if not input_sequence:
-        return [0.0] * 5
-    key_count = sum(1 for e in input_sequence if e.get("type") == "key_press")
-    click_count = sum(1 for e in input_sequence if e.get("type") == "mouse_click")
-    scroll_count = sum(1 for e in input_sequence if e.get("type") == "mouse_scroll")
-    total = len(input_sequence)
-    timestamps = [e["timestamp"] for e in input_sequence]
-    duration = max(timestamps) - min(timestamps)
-    eps = total / duration if duration > 0 else 0.0
-    return [float(key_count), float(click_count), float(scroll_count), float(total), eps]
+def _gaming_keys_block(input_since_last: dict) -> list[float]:
+    """8 per-key press counts (log1p), in the canonical key order."""
+    keys = (input_since_last or {}).get("gaming_keys") or {}
+    return [
+        math.log1p(max(0.0, _safe_float(keys.get(k))))
+        for k in _GAMING_KEYS
+    ]
 
 
-def _shannon_entropy(counts: dict[str, int]) -> float:
-    """Compute Shannon entropy (bits) of a {key: count} dict."""
-    total = sum(counts.values())
-    if total <= 0:
-        return 0.0
-    ent = 0.0
-    for c in counts.values():
-        if c > 0:
-            p = c / total
-            ent -= p * math.log2(p)
-    return ent
+def _app_hash_block(app_name: str) -> list[float]:
+    """One-hot 16-bucket SHA-256 indicator over lower-cased app name."""
+    out = [0.0] * _APP_HASH_BUCKETS
+    if not app_name:
+        return out
+    digest = hashlib.sha256(app_name.strip().lower().encode("utf-8")).digest()
+    bucket = int.from_bytes(digest[:8], "big") % _APP_HASH_BUCKETS
+    out[bucket] = 1.0
+    return out
 
-
-def _heatmap_stats(key_heatmaps: dict) -> list[float]:
-    """Return 24 features (4 per window) + 8 gaming-key counts = 32 total."""
-    result: list[float] = []
-    for label in _HEATMAP_LABELS:
-        window = key_heatmaps.get(label, {})
-        if not window:
-            result.extend([0.0, 0.0, 0.0, 0.0])
-        else:
-            total = float(sum(window.values()))
-            unique = float(len(window))
-            mx = float(max(window.values()))
-            ent = _shannon_entropy(window)
-            result.extend([total, unique, mx, ent])
-    # Gaming-key counts from the 3m window
-    window_3m = key_heatmaps.get("3m", {})
-    for key in _GAMING_KEYS:
-        result.append(float(window_3m.get(key, 0)))
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
 def extract_tabular_features(sample: dict) -> list[float]:
-    """Convert a single sample dict to a flat list of ``TABULAR_DIM`` floats.
+    """Convert one sample dict to a flat list of ``TABULAR_DIM`` floats.
 
     Parameters
     ----------
@@ -146,44 +137,11 @@ def extract_tabular_features(sample: dict) -> list[float]:
         Feature vector of length ``TABULAR_DIM``.
     """
     features: list[float] = []
-
-    # CPU (10)
-    features.extend(_history_stats(
-        sample.get("cpu_history", []),
-        ["percent", "freq_ghz"],
-    ))
-
-    # RAM (15)
-    features.extend(_history_stats(
-        sample.get("ram_history", []),
-        ["percent", "used_gb", "total_gb"],
-    ))
-
-    # GPU (20 + 1 flag)
-    gpu_hist = sample.get("gpu_history", [])
-    features.extend(_history_stats(
-        gpu_hist,
-        ["load_percent", "memory_used_gb", "memory_total_gb", "temperature_c"],
-    ))
-    features.append(1.0 if gpu_hist else 0.0)
-
-    # Disk (10)
-    features.extend(_history_stats(
-        sample.get("disk_history", []),
-        ["read_bps", "write_bps"],
-    ))
-
-    # Input count (1)
-    features.append(float(sample.get("input_count", 0)))
-
-    # Flick vectors (8)
-    features.extend(_flick_stats(sample.get("flick_vectors", [])))
-
-    # Input sequence (5)
-    features.extend(_sequence_stats(sample.get("input_sequence", [])))
-
-    # Heatmaps (32)
-    features.extend(_heatmap_stats(sample.get("key_heatmaps", {})))
+    features.extend(_hw_recent_block(sample.get("hw_recent", [])))
+    features.extend(_input_block(sample.get("input_since_last", {})))
+    features.extend(_flick_block(sample.get("input_since_last", {})))
+    features.extend(_gaming_keys_block(sample.get("input_since_last", {})))
+    features.extend(_app_hash_block(sample.get("app_name", "")))
 
     assert len(features) == TABULAR_DIM, (
         f"Expected {TABULAR_DIM} features, got {len(features)}"

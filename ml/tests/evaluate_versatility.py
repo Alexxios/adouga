@@ -38,7 +38,7 @@ from src.multimodal_model import MultimodalGameClassifier  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-_TESTER_RE = re.compile(r"_([a-z_]+)\.zip$")
+_TESTER_RE = re.compile(r"_([a-z0-9_()]+)\.zip$")
 _LABEL_NAMES = sorted(_LABEL_MAP, key=_LABEL_MAP.get)  # index-aligned
 
 

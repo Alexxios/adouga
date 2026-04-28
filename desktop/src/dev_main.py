@@ -58,7 +58,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--interval",
         type=float,
-        default=0.5,
+        default=1.0,
         metavar="SECONDS",
         help="Sample capture interval in seconds",
     )

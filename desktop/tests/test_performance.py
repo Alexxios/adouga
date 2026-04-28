@@ -30,7 +30,7 @@ from PIL import Image
 from src.core.hardware_monitor import HardwareMonitor, _sample_gpu_once
 from src.core.input_monitor import InputMonitor, _HEATMAP_INTERVALS
 from src.core.screenshot import take_screenshot
-from src.core.window import get_active_window_rect
+from src.core.window import get_active_window_info, get_active_window_rect
 
 _ONNX_MODEL = (
     Path(__file__).parent.parent.parent / "ml" / "models" / "model.onnx"
@@ -374,20 +374,16 @@ def test_main_loop_tick_latency():
     try:
         t0 = time.perf_counter()
 
-        # 1. Fetch hardware histories
-        cpu_history = hw.get_cpu_history()
-        ram_history = hw.get_ram_history()
-        gpu_history = hw.get_gpu_history()
-        disk_history = hw.get_disk_history()
+        # 1. Per-sample HW snapshot
+        latest = hw.get_latest()
 
-        # 2. Input data
-        input_count = im.get_and_reset_count()
-        flicks = im.get_flicks()
-        heatmaps = im.get_key_heatmaps()
+        # 2. Per-sample input aggregates + flick drain
+        input_agg = im.get_and_reset_input_aggregates()
+        flicks = im.get_and_reset_flicks()
 
-        # 3. Screenshot
-        rect = get_active_window_rect()
-        img = take_screenshot(rect)
+        # 3. Foreground window info + screenshot
+        rect, app_name, window_title = get_active_window_info()
+        img = take_screenshot(rect) if rect else None
 
         # 4. Inference (if screenshot succeeded)
         if img is not None:

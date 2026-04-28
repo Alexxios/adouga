@@ -19,14 +19,37 @@ def _make_sample_dict(timestamp: float = 1000.0, label: str = "Gaming") -> dict:
     return {
         "timestamp": timestamp,
         "label": label,
-        "cpu_history": [{"timestamp": timestamp, "percent": 30.0, "freq_ghz": 3.0}],
-        "ram_history": [{"timestamp": timestamp, "percent": 50.0, "used_gb": 8.0, "total_gb": 16.0}],
-        "gpu_history": [],
-        "disk_history": [],
-        "input_count": 5,
-        "flick_vectors": [(1, 2)],
-        "input_sequence": [{"timestamp": timestamp, "type": "key_press", "value": "a"}],
-        "key_heatmaps": {"1s": {"a": 1}, "5s": {}, "15s": {}, "30s": {}, "1m": {}, "3m": {}},
+        "app_name": "valorant.exe",
+        "window_title": "VALORANT",
+        "hw_recent": [{
+            "timestamp": timestamp,
+            "cpu_percent": 30.0,
+            "cpu_freq_ghz": 3.0,
+            "ram_percent": 50.0,
+            "ram_used_gb": 8.0,
+            "gpu_present": 0,
+            "gpu_load_percent": None,
+            "gpu_memory_used_gb": None,
+            "gpu_temperature_c": None,
+            "disk_read_bps": 1024.0,
+            "disk_write_bps": 512.0,
+        }],
+        "input_since_last": {
+            "key_press_count": 3,
+            "mouse_click_count": 1,
+            "mouse_scroll_count": 0,
+            "mouse_move_count": 4,
+            "total_count": 8,
+            "flick_count": 1,
+            "flick_mag_mean": 22.36,
+            "flick_mag_max": 22.36,
+            "flick_dx_mean": 1.0,
+            "flick_dy_mean": 2.0,
+            "gaming_keys": {
+                "w": 1, "a": 0, "s": 0, "d": 0,
+                "space": 0, "shift": 0, "left": 0, "right": 0,
+            },
+        },
     }
 
 
@@ -86,7 +109,7 @@ def test_label_mapping(tmp_path):
     ds = MultimodalGameDataset([zp])
     _, _, label0 = ds[0]
     _, _, label1 = ds[1]
-    assert label0 == 0  # Gaming
+    assert label0 == 2  # Gaming
     assert label1 == 1  # Not Gaming
     ds.close()
 

@@ -13,6 +13,11 @@ _FLICK_MIN_MAG = 10        # pixels — minimum movement magnitude to count as a
 _FLICK_BUFFER = 300        # how many flick vectors to retain
 _EVENT_BUFFER_SECONDS = 180  # how far back to keep raw input events (3 minutes)
 
+# Keys whose per-sample counts feed the ML tabular branch (gaming-relevant).
+_GAMING_KEYS: tuple[str, ...] = (
+    "w", "a", "s", "d", "space", "shift", "left", "right",
+)
+
 # (window_seconds, label) — used for heatmap aggregation
 _HEATMAP_INTERVALS: list[tuple[int, str]] = [
     (1,   "1s"),
@@ -50,6 +55,13 @@ class InputMonitor:
         self.counter: int = 0
         self._lock = threading.Lock()
 
+        # Per-sample drainable counts (separate from `counter` which UI consumes).
+        self._key_press_count: int = 0
+        self._mouse_click_count: int = 0
+        self._mouse_scroll_count: int = 0
+        self._mouse_move_count: int = 0
+        self._gaming_key_counts: dict[str, int] = {k: 0 for k in _GAMING_KEYS}
+
         # Flick vectors
         self._flicks: deque = deque(maxlen=_FLICK_BUFFER)
         self._last_pos: tuple | None = None
@@ -83,6 +95,9 @@ class InputMonitor:
         name = _key_name(key)
         with self._lock:
             self.counter += 1
+            self._key_press_count += 1
+            if name in self._gaming_key_counts:
+                self._gaming_key_counts[name] += 1
             self._record_event("key_press", name)
         # Forward to hotkeys (uses canonical form from the listener)
         for hk in self._hotkeys:
@@ -99,12 +114,14 @@ class InputMonitor:
         btn_name = str(button).split(".")[-1]
         with self._lock:
             self.counter += 1
+            self._mouse_click_count += 1
             self._record_event("mouse_click", btn_name)
 
     def _on_mouse_scroll(self, x, y, dx, dy) -> None:
         direction = "scroll_up" if dy > 0 else "scroll_down"
         with self._lock:
             self.counter += 1
+            self._mouse_scroll_count += 1
             self._record_event("mouse_scroll", direction)
 
     def _on_move(self, x, y) -> None:
@@ -114,6 +131,7 @@ class InputMonitor:
             if ddx * ddx + ddy * ddy >= _FLICK_MIN_MAG ** 2:
                 with self._lock:
                     self._flicks.append((ddx, ddy))
+                    self._mouse_move_count += 1
         self._last_pos = (x, y)
 
     def _record_event(self, event_type: str, value: str) -> None:
@@ -142,6 +160,56 @@ class InputMonitor:
         """Return a snapshot of recent mouse-flick vectors as [(dx, dy), ...]."""
         with self._lock:
             return list(self._flicks)
+
+    def get_and_reset_flicks(self) -> list:
+        """Return all buffered flick vectors and clear the buffer.
+
+        Used by the recorder so each captured sample carries only the flicks
+        observed since the previous sample (avoiding the saturation that the
+        bounded ``_FLICK_BUFFER`` deque otherwise causes).
+        """
+        with self._lock:
+            flicks = list(self._flicks)
+            self._flicks.clear()
+        return flicks
+
+    def get_and_reset_input_aggregates(self) -> dict:
+        """Return per-sample input aggregates and reset all per-type counters.
+
+        Returned shape::
+
+            {
+              "key_press_count":   int,
+              "mouse_click_count": int,
+              "mouse_scroll_count":int,
+              "mouse_move_count":  int,
+              "total_count":       int,   # sum of the four above
+              "gaming_keys": {"w": int, "a": int, ..., "right": int},
+            }
+
+        Independent of ``get_and_reset_count()`` — both can be drained per
+        sample without interfering.
+        """
+        with self._lock:
+            kp = self._key_press_count
+            mc = self._mouse_click_count
+            ms = self._mouse_scroll_count
+            mm = self._mouse_move_count
+            gk = dict(self._gaming_key_counts)
+            self._key_press_count = 0
+            self._mouse_click_count = 0
+            self._mouse_scroll_count = 0
+            self._mouse_move_count = 0
+            for k in self._gaming_key_counts:
+                self._gaming_key_counts[k] = 0
+        return {
+            "key_press_count": kp,
+            "mouse_click_count": mc,
+            "mouse_scroll_count": ms,
+            "mouse_move_count": mm,
+            "total_count": kp + mc + ms + mm,
+            "gaming_keys": gk,
+        }
 
     def get_input_sequence(self, window_seconds: float = _EVENT_BUFFER_SECONDS) -> list:
         """Return all raw input events from the last *window_seconds*.

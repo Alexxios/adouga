@@ -127,6 +127,22 @@ class HardwareMonitor:
         with self._lock:
             return list(self._disk_hist)
 
+    def get_latest(self) -> dict:
+        """Return the most recent reading for each metric.
+
+        Returns a dict with keys ``cpu``, ``ram``, ``gpu``, ``disk``. Each
+        value is the last entry in the corresponding rolling deque, or
+        ``None`` when the deque is empty (e.g. no GPU detected, disk I/O
+        unavailable, or the monitor hasn't sampled yet).
+        """
+        with self._lock:
+            return {
+                "cpu": self._cpu_hist[-1] if self._cpu_hist else None,
+                "ram": self._ram_hist[-1] if self._ram_hist else None,
+                "gpu": self._gpu_hist[-1] if self._gpu_hist else None,
+                "disk": self._disk_hist[-1] if self._disk_hist else None,
+            }
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------

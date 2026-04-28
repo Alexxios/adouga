@@ -66,6 +66,30 @@ def test_hardware_monitor_max_entries():
 
 
 # ---------------------------------------------------------------------------
+# HardwareMonitor — get_latest
+# ---------------------------------------------------------------------------
+
+def test_get_latest_returns_none_when_empty():
+    hw = HardwareMonitor()
+    latest = hw.get_latest()
+    assert latest == {"cpu": None, "ram": None, "gpu": None, "disk": None}
+
+
+def test_get_latest_returns_most_recent_entries():
+    hw = HardwareMonitor()
+    hw._cpu_hist.append({"timestamp": 1.0, "percent": 10.0})
+    hw._cpu_hist.append({"timestamp": 2.0, "percent": 25.0})
+    hw._ram_hist.append({"timestamp": 2.0, "percent": 60.0})
+    hw._disk_hist.append({"timestamp": 2.0, "read_bps": 1024, "write_bps": 0})
+
+    latest = hw.get_latest()
+    assert latest["cpu"]["percent"] == 25.0
+    assert latest["ram"]["percent"] == 60.0
+    assert latest["gpu"] is None
+    assert latest["disk"]["read_bps"] == 1024
+
+
+# ---------------------------------------------------------------------------
 # HardwareMonitor — _disk_delta
 # ---------------------------------------------------------------------------
 
