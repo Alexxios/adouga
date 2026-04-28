@@ -24,33 +24,16 @@ jobs:
         run: |
           pip install poetry poetry-plugin-export
           cd desktop
-          poetry export --without-hashes --without dev -f requirements.txt -o requirements.txt
-          pip install -r requirements.txt
-          pip install pyinstaller
+          poetry export --without-hashes --without dev,inference,macos -f requirements.txt -o requirements.txt
 
       - name: Create .env with token
         run: echo "YADISK_TOKEN=${{ secrets.YADISK_TOKEN }}" > desktop/.env
 
       - name: Build with PyInstaller
-        run: |
-          cd desktop
-          pyinstaller dev_main.spec
-
-      - name: Build Inno Setup installer
-        if: runner.os == 'Windows'
-        run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" desktop\installer.iss
-        shell: pwsh
-
-      - name: Upload executable
-        uses: actions/upload-artifact@v4
+        uses: sayyid5416/pyinstaller@v1
         with:
-          name: AdougaDev-${{ runner.os }}
-          path: desktop/dist/AdougaDev*
-
-      - name: Upload installer
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: AdougaDevSetup-Windows
-          path: desktop/output/AdougaDevSetup.exe
+          spec: desktop/dev_main.spec
+          requirements: desktop/requirements.txt
+          python_ver: "3.12"
+          clean_checkout: false
+          upload_exe_with_name: AdougaDev
