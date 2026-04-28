@@ -6,7 +6,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
 
     env:
@@ -24,7 +24,7 @@ jobs:
         run: |
           pip install poetry poetry-plugin-export
           cd desktop
-          poetry export --without-hashes --without dev --with macos -f requirements.txt -o requirements.txt
+          poetry export --without-hashes --without dev -f requirements.txt -o requirements.txt
           pip install -r requirements.txt
           pip install pyinstaller
 
