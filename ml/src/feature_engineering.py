@@ -7,22 +7,26 @@ Layout (deterministic — index-aligned with the model's tabular branch):
   [50:56)   Input counts — key_press / mouse_click / mouse_scroll / mouse_move
             / total / + 1 reserved slot (currently 0 to keep the dim stable).
   [56:61)   Flick stats — count, mag_mean, mag_max, dx_mean, dy_mean.
-  [61:69)   Gaming key counts (this tick) — w, a, s, d, space, shift, left, right.
-  [69:85)   16-bucket SHA-256 indicator over the lower-cased ``app_name``.
-  [85:109)  Key-heatmap window stats — 6 windows (1s/5s/15s/30s/1m/3m) ×
+  [61:77)   16-bucket SHA-256 indicator over the lower-cased ``app_name``.
+  [77:101)  Key-heatmap window stats — 6 windows (1s/5s/15s/30s/1m/3m) ×
             (total, unique, max, entropy).
-  [109:117) 3m-window gaming-key counts — same key order as the per-tick block.
+  [101:149) Per-window top-8 key-press counts — 6 windows × 8 slots, each
+            slot holding the k-th largest press count in that window
+            (sorted descending, zero-padded, log1p-transformed). Anonymous
+            by design: the model sees the *shape* of the press distribution
+            (concentration vs. spread) so it generalises across games with
+            different bindings instead of memorising WASD-style keys.
 
 Heavy-tailed quantities (disk bps, all input counts, flick magnitudes,
-heatmap totals/maxes) are ``log1p``-transformed at extraction time so the
-tabular branch sees the same scales it will see in production. Empty /
-missing fields → zeros.
+heatmap totals/maxes, top-N counts) are ``log1p``-transformed at extraction
+time so the tabular branch sees the same scales it will see in production.
+Empty / missing fields → zeros.
 """
 
 import hashlib
 import math
 
-TABULAR_DIM = 117
+TABULAR_DIM = 149
 
 _HW_RECENT_DEPTH = 5
 _HW_FIELDS: tuple[tuple[str, bool], ...] = (
@@ -40,9 +44,7 @@ _HW_FIELDS: tuple[tuple[str, bool], ...] = (
 )
 assert len(_HW_FIELDS) == 10  # noqa: PLR2004 — schema invariant
 
-_GAMING_KEYS: tuple[str, ...] = (
-    "w", "a", "s", "d", "space", "shift", "left", "right",
-)
+_TOP_KEYS_PER_WINDOW = 8
 _APP_HASH_BUCKETS = 16
 
 # Order of heatmap windows fed to the tabular branch. Must match the keys
@@ -110,15 +112,6 @@ def _flick_block(input_since_last: dict) -> list[float]:
     ]
 
 
-def _gaming_keys_block(input_since_last: dict) -> list[float]:
-    """8 per-key press counts (log1p), in the canonical key order."""
-    keys = (input_since_last or {}).get("gaming_keys") or {}
-    return [
-        math.log1p(max(0.0, _safe_float(keys.get(k))))
-        for k in _GAMING_KEYS
-    ]
-
-
 def _app_hash_block(app_name: str) -> list[float]:
     """One-hot 16-bucket SHA-256 indicator over lower-cased app name."""
     out = [0.0] * _APP_HASH_BUCKETS
@@ -155,14 +148,28 @@ def _heatmap_window_stats(window: dict) -> list[float]:
     return [math.log1p(total), unique, math.log1p(mx), ent]
 
 
+def _top_n_block(window: dict, n: int = _TOP_KEYS_PER_WINDOW) -> list[float]:
+    """Top-*n* press counts from *window*, sorted desc, zero-padded, log1p.
+
+    Anonymous by design — the slot index is the rank, not the key identity —
+    so the model sees how concentrated the input is on a few keys without
+    being tied to any specific binding (WASD vs QWER vs arrows vs numpad).
+    """
+    if not window:
+        return [0.0] * n
+    counts = sorted((int(v) for v in window.values()), reverse=True)[:n]
+    counts.extend([0] * (n - len(counts)))
+    return [math.log1p(max(0.0, float(c))) for c in counts]
+
+
 def _heatmap_block(key_heatmaps: dict) -> list[float]:
-    """6 windows × 4 stats + 8 gaming-key counts from the 3m window = 32 floats."""
+    """6 windows × 4 stats, then 6 windows × top-N press counts."""
+    src = key_heatmaps or {}
     out: list[float] = []
     for label in _HEATMAP_LABELS:
-        out.extend(_heatmap_window_stats((key_heatmaps or {}).get(label) or {}))
-    window_3m = (key_heatmaps or {}).get("3m") or {}
-    for key in _GAMING_KEYS:
-        out.append(math.log1p(max(0.0, _safe_float(window_3m.get(key)))))
+        out.extend(_heatmap_window_stats(src.get(label) or {}))
+    for label in _HEATMAP_LABELS:
+        out.extend(_top_n_block(src.get(label) or {}))
     return out
 
 
@@ -184,7 +191,6 @@ def extract_tabular_features(sample: dict) -> list[float]:
     features.extend(_hw_recent_block(sample.get("hw_recent", [])))
     features.extend(_input_block(sample.get("input_since_last", {})))
     features.extend(_flick_block(sample.get("input_since_last", {})))
-    features.extend(_gaming_keys_block(sample.get("input_since_last", {})))
     features.extend(_app_hash_block(sample.get("app_name", "")))
     features.extend(_heatmap_block(sample.get("key_heatmaps", {})))
 

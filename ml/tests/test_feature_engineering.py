@@ -6,14 +6,15 @@ import pytest
 
 from src.feature_engineering import (
     TABULAR_DIM,
-    _GAMING_KEYS,
     _HEATMAP_LABELS,
     _HW_RECENT_DEPTH,
+    _TOP_KEYS_PER_WINDOW,
     _app_hash_block,
     _heatmap_block,
     _heatmap_window_stats,
     _hw_recent_block,
     _shannon_entropy,
+    _top_n_block,
     extract_tabular_features,
 )
 
@@ -78,8 +79,8 @@ _FULL_SAMPLE = {
 # TABULAR_DIM constant
 # ---------------------------------------------------------------------------
 
-def test_tabular_dim_is_117():
-    assert TABULAR_DIM == 117
+def test_tabular_dim_is_149():
+    assert TABULAR_DIM == 149
 
 
 def test_block_sizes_sum_to_tabular_dim():
@@ -87,12 +88,14 @@ def test_block_sizes_sum_to_tabular_dim():
     hw_block_size = _HW_RECENT_DEPTH * 10
     input_block_size = 6
     flick_block_size = 5
-    gaming_keys_size = len(_GAMING_KEYS)
     app_hash_size = 16
-    heatmap_block_size = len(_HEATMAP_LABELS) * 4 + len(_GAMING_KEYS)
+    heatmap_block_size = (
+        len(_HEATMAP_LABELS) * 4
+        + len(_HEATMAP_LABELS) * _TOP_KEYS_PER_WINDOW
+    )
     total = (
         hw_block_size + input_block_size + flick_block_size
-        + gaming_keys_size + app_hash_size + heatmap_block_size
+        + app_hash_size + heatmap_block_size
     )
     assert total == TABULAR_DIM
 
@@ -251,7 +254,8 @@ def test_heatmap_window_stats_shape():
 
 def test_heatmap_block_size():
     block = _heatmap_block({})
-    assert len(block) == len(_HEATMAP_LABELS) * 4 + len(_GAMING_KEYS)
+    expected = len(_HEATMAP_LABELS) * 4 + len(_HEATMAP_LABELS) * _TOP_KEYS_PER_WINDOW
+    assert len(block) == expected
 
 
 def test_heatmap_block_includes_all_windows():
@@ -261,3 +265,51 @@ def test_heatmap_block_includes_all_windows():
     # Each window's first stat is log1p(total); total here is i+1.
     for i in range(len(_HEATMAP_LABELS)):
         assert block[i * 4] == pytest.approx(math.log1p(i + 1), abs=1e-6)
+
+
+def test_heatmap_block_top_n_section_after_stats():
+    """Top-N block follows the stats block; first slot of each window is log1p(i+1)."""
+    block = _heatmap_block({
+        label: {"w": i + 1} for i, label in enumerate(_HEATMAP_LABELS)
+    })
+    stats_len = len(_HEATMAP_LABELS) * 4
+    for i in range(len(_HEATMAP_LABELS)):
+        slot = stats_len + i * _TOP_KEYS_PER_WINDOW
+        assert block[slot] == pytest.approx(math.log1p(i + 1), abs=1e-6)
+        # Remaining top-N slots for that window are zero-padded.
+        for j in range(1, _TOP_KEYS_PER_WINDOW):
+            assert block[slot + j] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Top-N block — sorted, padded, log1p
+# ---------------------------------------------------------------------------
+
+def test_top_n_block_empty_window_is_zeros():
+    assert _top_n_block({}) == [0.0] * _TOP_KEYS_PER_WINDOW
+
+
+def test_top_n_block_sorts_descending():
+    block = _top_n_block({"a": 2, "b": 9, "c": 5})
+    assert len(block) == _TOP_KEYS_PER_WINDOW
+    assert block[0] == pytest.approx(math.log1p(9), abs=1e-6)
+    assert block[1] == pytest.approx(math.log1p(5), abs=1e-6)
+    assert block[2] == pytest.approx(math.log1p(2), abs=1e-6)
+    # Remaining slots zero-padded.
+    assert all(v == 0.0 for v in block[3:])
+
+
+def test_top_n_block_truncates_when_more_keys_than_n():
+    counts = {f"k{i}": i + 1 for i in range(_TOP_KEYS_PER_WINDOW + 4)}
+    block = _top_n_block(counts)
+    assert len(block) == _TOP_KEYS_PER_WINDOW
+    # Largest count is _TOP_KEYS_PER_WINDOW + 4; smallest kept is 5 (i.e., counts[4]).
+    assert block[0] == pytest.approx(math.log1p(_TOP_KEYS_PER_WINDOW + 4), abs=1e-6)
+    assert block[-1] == pytest.approx(math.log1p(5), abs=1e-6)
+
+
+def test_top_n_block_is_anonymous():
+    """Permuting key names must not change the block — only counts matter."""
+    a = _top_n_block({"w": 5, "a": 3, "s": 1})
+    b = _top_n_block({"q": 5, "e": 3, "r": 1})
+    assert a == b
