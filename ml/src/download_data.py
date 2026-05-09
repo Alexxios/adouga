@@ -31,9 +31,10 @@ def _resolve_token() -> str:
     return token
 
 
-def download_all(remote_base: str, output_dir: Path) -> None:
+def download_all(remote_base: str, output_dir: Path, exclude: set[str] | None = None) -> None:
     token = _resolve_token()
     output_dir.mkdir(parents=True, exist_ok=True)
+    exclude = exclude or set()
 
     with yadisk.Client(token=token) as client:
         if not client.check_token():
@@ -42,8 +43,10 @@ def download_all(remote_base: str, output_dir: Path) -> None:
 
         print(f"Connected to Yandex Disk")
         print(f"Scanning {remote_base}/ ...")
+        if exclude:
+            print(f"Excluding directories: {sorted(exclude)}")
 
-        zip_files = list(_find_zips(client, remote_base))
+        zip_files = list(_find_zips(client, remote_base, exclude))
 
         if not zip_files:
             print("No ZIP files found.")
@@ -81,12 +84,15 @@ def download_all(remote_base: str, output_dir: Path) -> None:
         print(f"\nDone: {downloaded} downloaded, {skipped} skipped, {failed} failed")
 
 
-def _find_zips(client: yadisk.Client, path: str):
+def _find_zips(client: yadisk.Client, path: str, exclude: set[str]):
     """Recursively find all .zip files under a remote directory."""
     try:
         for item in client.listdir(path):
             if item.type == "dir":
-                yield from _find_zips(client, item.path)
+                if item.name in exclude:
+                    print(f"  Skipping excluded directory: {item.path}")
+                    continue
+                yield from _find_zips(client, item.path, exclude)
             elif item.name.endswith(".zip"):
                 yield item.path
     except yadisk.exceptions.PathNotFoundError:
@@ -97,9 +103,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Download training data from Yandex Disk")
     parser.add_argument("--output", "-o", default=_DEFAULT_OUTPUT, help="Local output directory")
     parser.add_argument("--remote", "-r", default=_REMOTE_BASE, help="Remote base directory on Yandex Disk")
+    parser.add_argument(
+        "--exclude",
+        "-x",
+        action="append",
+        default=[],
+        help="Directory name to skip during traversal (can be passed multiple times)",
+    )
     args = parser.parse_args()
 
-    download_all(args.remote, Path(args.output))
+    download_all(args.remote, Path(args.output), set(args.exclude))
 
 
 if __name__ == "__main__":
