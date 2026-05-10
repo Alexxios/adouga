@@ -55,7 +55,7 @@ class TestONNXClassifier:
 
         # Check that session was created
         assert mock_session.called
-        assert classifier.input_name == 'input'
+        assert classifier.image_input_name == 'input'
         assert classifier.output_name == 'output'
         assert classifier.input_size == (224, 224)
         assert classifier.class_labels == ["Not Gaming", "Gaming"]

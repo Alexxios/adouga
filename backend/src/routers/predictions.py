@@ -1,6 +1,12 @@
 import math
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _to_utc_naive(dt: datetime | None) -> datetime | None:
+    if dt is not None and dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -42,6 +48,9 @@ async def list_predictions(
 ):
     query = select(Prediction).where(Prediction.user_id == user.id)
     count_query = select(func.count()).select_from(Prediction).where(Prediction.user_id == user.id)
+
+    date_from = _to_utc_naive(date_from)
+    date_to = _to_utc_naive(date_to)
 
     if date_from:
         query = query.where(Prediction.timestamp >= date_from)

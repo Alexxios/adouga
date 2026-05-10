@@ -1,9 +1,12 @@
 """AI prediction page — screenshot and classification results."""
 
+import threading
+import time as _time
 import tkinter as tk
 
 from PIL import Image, ImageTk
 
+from src.app.backend_client import BackendError
 from src.core.theme import ModernTheme
 
 
@@ -14,6 +17,8 @@ class AIPage(tk.Frame):
         tk.Frame.__init__(self, parent, bg=ModernTheme.BACKGROUND_DARK)
         self.controller = controller
         self.last_prediction = None
+        self._last_upload_status: str = ""
+        self._last_upload_color: str = ModernTheme.TEXT_SECONDARY
 
         # Main container with two sections (no header)
         main_container = tk.Frame(self, bg=ModernTheme.BACKGROUND_DARK)
@@ -113,6 +118,16 @@ class AIPage(tk.Frame):
         )
         self.status_label.pack(side=tk.BOTTOM, pady=5)
 
+        # Upload status label
+        self.upload_label = tk.Label(
+            self.right_frame,
+            text="Upload: not logged in",
+            bg=ModernTheme.SURFACE,
+            fg=ModernTheme.TEXT_SECONDARY,
+            font=(ModernTheme.FONT_FAMILY, ModernTheme.FONT_SIZE_SMALL)
+        )
+        self.upload_label.pack(side=tk.BOTTOM, pady=2)
+
     def update_view(self):
         """Update the AI page with latest screenshot and prediction."""
         img = self.controller.current_image
@@ -187,6 +202,9 @@ class AIPage(tk.Frame):
                     fg=ModernTheme.SUCCESS
                 )
 
+                self._maybe_upload(prediction)
+                self._refresh_upload_label()
+
             except Exception as e:
                 self.status_label.config(
                     text=f"Status: Error - {str(e)}",
@@ -247,3 +265,61 @@ class AIPage(tk.Frame):
                     width=bar_width,
                     height=20
                 ).pack(side=tk.LEFT)
+
+    # ---- Backend upload ----------------------------------------------
+
+    def _maybe_upload(self, prediction: dict) -> None:
+        """Fire-and-forget POST to backend if logged in."""
+        client = getattr(self.controller, "backend_client", None)
+        if client is None or not client.is_authenticated:
+            return
+
+        payload = {
+            "predicted_class": prediction["predicted_class"],
+            "confidence": float(prediction["confidence"]),
+            "probabilities": {k: float(v) for k, v in prediction["probabilities"].items()},
+            "timestamp": _time.time(),
+        }
+        threading.Thread(
+            target=self._upload_worker, args=(client, payload), daemon=True
+        ).start()
+
+    def _upload_worker(self, client, payload: dict) -> None:
+        try:
+            client.post_prediction(**payload)
+            ts = _time.strftime("%H:%M:%S")
+            self.after(
+                0,
+                lambda: self._set_upload_status(
+                    f"Upload: ok ({payload['predicted_class']} @ {ts})",
+                    ModernTheme.SUCCESS,
+                ),
+            )
+        except BackendError as e:
+            msg = str(e)
+            self.after(
+                0,
+                lambda: self._set_upload_status(f"Upload failed: {msg}", ModernTheme.ERROR),
+            )
+
+    def _set_upload_status(self, text: str, color: str) -> None:
+        self._last_upload_status = text
+        self._last_upload_color = color
+        self.upload_label.config(text=text, fg=color)
+
+    def _refresh_upload_label(self) -> None:
+        client = getattr(self.controller, "backend_client", None)
+        if client is None or not client.is_authenticated:
+            self.upload_label.config(
+                text="Upload: not logged in (Settings)",
+                fg=ModernTheme.TEXT_SECONDARY,
+            )
+        elif self._last_upload_status:
+            self.upload_label.config(
+                text=self._last_upload_status, fg=self._last_upload_color
+            )
+        else:
+            self.upload_label.config(
+                text=f"Upload: ready ({client.username})",
+                fg=ModernTheme.TEXT_SECONDARY,
+            )

@@ -17,8 +17,12 @@ _USER_APP_HW_RECENT_DEPTH = 5
 from src.app.ui.monitor_page import MonitorPage
 from src.app.ui.ai_page import AIPage
 from src.app.ui.distributions_page import DistributionsPage
+from src.app.ui.connection_dialog import ConnectionDialog
 from src.app.ui.navbar import ModernNavbar
 from src.app.inference import ONNXClassifier
+from src.app.backend_client import BackendClient
+
+DEFAULT_BACKEND_URL = "http://localhost:8008"
 
 class SystemMonitorApp(tk.Tk):
     def __init__(self):
@@ -65,6 +69,9 @@ class SystemMonitorApp(tk.Tk):
             print(f"Failed to start HardwareMonitor: {e}")
             self.hw_monitor = None
 
+        # --- Backend client (shared by Settings page and AIPage upload) ---
+        self.backend_client = BackendClient(DEFAULT_BACKEND_URL)
+
         # --- UI Setup ---
         # Create modern navbar
         pages = [
@@ -72,12 +79,14 @@ class SystemMonitorApp(tk.Tk):
             ("MonitorPage", "Live Stats"),
             ("DistributionsPage", "Distributions"),
         ]
+        self._connection_dialog: ConnectionDialog | None = None
         self.navbar = ModernNavbar(
             self,
             pages=pages,
             on_page_change=self.show,
             on_theme_change=self._apply_theme,
-            backend_url="http://0.0.0.0:7999",
+            on_settings_click=self._open_connection_dialog,
+            backend_url=self.backend_client.base_url,
         )
         self.navbar.pack(side=tk.TOP, fill=tk.X)
 
@@ -117,6 +126,13 @@ class SystemMonitorApp(tk.Tk):
         f = self.frames[name]
         f.tkraise()
         f.update_view()
+
+    def _open_connection_dialog(self) -> None:
+        if self._connection_dialog is not None and self._connection_dialog.winfo_exists():
+            self._connection_dialog.lift()
+            self._connection_dialog.focus_set()
+            return
+        self._connection_dialog = ConnectionDialog(self, self.backend_client)
 
     def _apply_theme(self):
         """Re-apply theme colours to root window and all pages."""

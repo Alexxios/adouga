@@ -19,6 +19,7 @@ class ModernNavbar(tk.Frame):
         pages: list,
         on_page_change: Callable,
         on_theme_change: Optional[Callable] = None,
+        on_settings_click: Optional[Callable] = None,
         backend_url: str = "http://localhost:8000",
         **kwargs,
     ):
@@ -27,6 +28,7 @@ class ModernNavbar(tk.Frame):
 
         self.on_page_change = on_page_change
         self._on_theme_change = on_theme_change
+        self._on_settings_click = on_settings_click
         self.nav_labels: Dict[str, tk.Label] = {}
         self._active_page: Optional[str] = None
 
@@ -91,6 +93,8 @@ class ModernNavbar(tk.Frame):
             cursor="hand2"
         )
         settings_label.pack(side=tk.LEFT, padx=(0, 15))
+        if self._on_settings_click is not None:
+            settings_label.bind("<Button-1>", lambda _: self._on_settings_click())
 
         # Profile icon container with network indicator
         profile_container = tk.Frame(right_nav, bg=ModernTheme.SURFACE_ELEVATED)

@@ -10,7 +10,7 @@
       "title": "HTTP Request Rate",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "rate(http_requests_total[5m])",
@@ -27,7 +27,7 @@
       "title": "Request Latency (p95)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
@@ -44,7 +44,7 @@
       "title": "Active Users",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "adouga_active_users",
@@ -61,7 +61,7 @@
       "title": "Prediction Uploads Rate",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "rate(adouga_prediction_uploads_total[5m])",
@@ -78,7 +78,7 @@
       "title": "External Service Requests",
       "type": "piechart",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "increase(adouga_external_requests_total[1h])",
