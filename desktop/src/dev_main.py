@@ -29,7 +29,7 @@ from src.dev.recorder import DataRecorder
 from src.dev.uploader import YaDiskUploader
 from src.dev.ui.dev_page import DevPage
 
-_DEFAULT_STATES = ["Idle", "Not Gaming", "Gaming"]
+_DEFAULT_STATES = ["Not Gaming", "Gaming"]
 _DEFAULT_OUTPUT_DIR = Path.home() / "adouga_ml_data"
 
 

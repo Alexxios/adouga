@@ -250,7 +250,7 @@ class DevPage(tk.Frame):
         self._pending_val = _row("Pending in queue:")
 
         # Initial state
-        self._status_val.config(text="Idle", fg=T.TEXT_SECONDARY)
+        self._status_val.config(text="Stopped", fg=T.TEXT_SECONDARY)
 
     # ------------------------------------------------------------------
     # Public API (called by controller)

@@ -148,8 +148,14 @@ class AIPage(tk.Frame):
                     )
                     return
 
-                # Get prediction with details
-                prediction = self.controller.classifier.predict_with_details(img)
+                # Get prediction with details — pass latest sample for multimodal models
+                latest_sample = None
+                samples = getattr(self.controller, "_samples", None)
+                if samples and len(samples) > 0:
+                    latest_sample = samples[-1].to_dict()
+                prediction = self.controller.classifier.predict_with_details(
+                    img, sample=latest_sample,
+                )
                 self.last_prediction = prediction
 
                 # Update prediction display

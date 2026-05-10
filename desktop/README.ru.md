@@ -101,7 +101,7 @@ cp .env.example .env          # заполните токен
 poetry run python src/dev_main.py
 
 # Кастомные состояния и окно
-poetry run python src/dev_main.py --states "Idle" "Gaming" "Browsing" --window 300
+poetry run python src/dev_main.py --states "Not Gaming" "Gaming" --window 300
 
 # Все опции
 poetry run python src/dev_main.py --help

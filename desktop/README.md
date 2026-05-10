@@ -101,7 +101,7 @@ cp .env.example .env          # fill in your token
 poetry run python src/dev_main.py
 
 # Custom states and window
-poetry run python src/dev_main.py --states "Idle" "Gaming" "Browsing" --window 300
+poetry run python src/dev_main.py --states "Not Gaming" "Gaming" --window 300
 
 # See all options
 poetry run python src/dev_main.py --help

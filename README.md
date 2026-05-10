@@ -1,6 +1,6 @@
 # Adouga — Automatic Detection of User Gaming Activity
 
-Adouga is a desktop-first system that monitors user activity on a PC, classifies it in real time (Idle / Not Gaming / Gaming), and exposes those predictions to external reward providers via a REST API. It also ships a data-collection tool for gathering training data and an ML training pipeline for the underlying models.
+Adouga is a desktop-first system that monitors user activity on a PC, classifies it in real time (Not Gaming / Gaming), and exposes those predictions to external reward providers via a REST API. It also ships a data-collection tool for gathering training data and an ML training pipeline for the underlying models.
 
 ## Modules
 

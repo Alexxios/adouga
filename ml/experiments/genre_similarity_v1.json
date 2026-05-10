@@ -1,0 +1,25 @@
+{
+  "name": "genre_similarity_v1",
+  "trained": [
+    "data/zips/*_cs2.zip",
+    "data/zips/*_apex.zip",
+    "data/zips/*_steam.zip",
+    "data/zips/*_twitchwuwa.zip",
+    "data/zips/*_hearthstone.zip",
+    "data/zips/*_wutheringwaves.zip",
+    "data/zips/*_wutheringwavespinball.zip",
+    "data/zips/*_adobe.zip",
+    "data/zips/*_pycharm.zip"
+  ],
+  "similar": [
+    "data/zips/*_valorant.zip",
+    "data/zips/*_riotclient.zip",
+    "data/zips/*_twitchcs2.zip"
+  ],
+  "out_of_box": [
+    "data/zips/*_rocketleague.zip",
+    "data/zips/*_paint.zip"
+  ],
+  "test_ratio": 0.2,
+  "seed": 42
+}

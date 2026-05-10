@@ -25,7 +25,12 @@ from src.feature_engineering import TABULAR_DIM, extract_tabular_features
 
 logger = logging.getLogger(__name__)
 
-_LABEL_MAP = {"Idle": 0, "Not Gaming": 1, "Gaming": 2}
+_LABEL_MAP = {"Not Gaming": 0, "Gaming": 1}
+
+# Legacy labels from earlier collection sessions. Older ZIP archives in the
+# data lake still contain these strings; remap them at load time so the
+# 996+ historical zips remain usable without re-collection.
+_LEGACY_LABEL_REMAP = {"Idle": "Not Gaming"}
 
 
 def _default_transform() -> transforms.Compose:
@@ -87,6 +92,7 @@ class MultimodalGameDataset(Dataset):
                 continue
             sample = json.loads(line)
             label_str = sample.get("label", "")
+            label_str = _LEGACY_LABEL_REMAP.get(label_str, label_str)
             if label_str not in _LABEL_MAP:
                 logger.warning("Unknown label %r in %s — skipping", label_str, zip_path)
                 continue

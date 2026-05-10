@@ -23,7 +23,7 @@ poetry run python -m src.main
 
 # Run dev app
 poetry run python -m src.dev_main --no-upload
-poetry run python -m src.dev_main --states "Idle" "Gaming" --window 300
+poetry run python -m src.dev_main --states "Not Gaming" "Gaming" --window 300
 
 # Run all tests
 poetry run pytest
