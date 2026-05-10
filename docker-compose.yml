@@ -1,12 +1,59 @@
-
 services:
-  # Your FastAPI App
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: adouga
+      POSTGRES_PASSWORD: adouga
+      POSTGRES_DB: adouga
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adouga"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   fastapi_app:
     build:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - "8000:8000"
+      - "8008:8008"
     volumes:
       - ./backend:/project/app
       - ./common:/project/common
+    environment:
+      DATABASE_URL: postgresql+asyncpg://adouga:adouga@db:5432/adouga
+      SECRET_KEY: dev-secret-key-change-in-production
+    depends_on:
+      db:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - fastapi_app
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  pgdata:
+  grafana_data:

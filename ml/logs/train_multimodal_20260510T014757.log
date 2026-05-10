@@ -1,0 +1,33 @@
+Training on 996 ZIP archive(s)
+Using device: mps
+2026-05-10 01:47:59,020 INFO     [src.multimodal_dataset] MultimodalGameDataset: 9933 samples from 996 ZIPs
+Train: 7946, Test: 1987
+Classes: 2 (Not Gaming, Gaming)
+2026-05-10 01:47:59,154 INFO     [src.multimodal_model] MultimodalGameClassifier: tabular_dim=149 classes=2 yolo=yolov8n-cls.pt
+2026-05-10 01:47:59,202 INFO     [src.multimodal_model] Backbone frozen
+Backbone frozen for initial training phase
+Epoch 1/20 — Train Loss: 0.0130, Train Acc: 0.9971 — Test Loss: 0.0002, Test Acc: 1.0000
+  Saved best model to models/multimodal_best.pth (acc: 1.0000)
+Epoch 2/20 — Train Loss: 0.0025, Train Acc: 0.9996 — Test Loss: 0.0002, Test Acc: 1.0000
+Epoch 3/20 — Train Loss: 0.0005, Train Acc: 1.0000 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 4/20 — Train Loss: 0.0082, Train Acc: 0.9981 — Test Loss: 0.0006, Test Acc: 1.0000
+Epoch 5/20 — Train Loss: 0.0053, Train Acc: 0.9984 — Test Loss: 0.0005, Test Acc: 1.0000
+2026-05-10 02:21:31,484 INFO     [src.multimodal_model] Backbone unfrozen
+Epoch 6: backbone unfrozen, LR backbone=0.0001
+Epoch 6/20 — Train Loss: 0.0033, Train Acc: 0.9989 — Test Loss: 0.0026, Test Acc: 0.9995
+Epoch 7/20 — Train Loss: 0.0010, Train Acc: 0.9996 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 8/20 — Train Loss: 0.0019, Train Acc: 0.9995 — Test Loss: 0.0001, Test Acc: 1.0000
+Epoch 9/20 — Train Loss: 0.0014, Train Acc: 0.9997 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 10/20 — Train Loss: 0.0001, Train Acc: 1.0000 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 11/20 — Train Loss: 0.0005, Train Acc: 0.9996 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 12/20 — Train Loss: 0.0016, Train Acc: 0.9996 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 13/20 — Train Loss: 0.0001, Train Acc: 1.0000 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 14/20 — Train Loss: 0.0000, Train Acc: 1.0000 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 15/20 — Train Loss: 0.0029, Train Acc: 0.9994 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 16/20 — Train Loss: 0.0000, Train Acc: 1.0000 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 17/20 — Train Loss: 0.0001, Train Acc: 1.0000 — Test Loss: 0.0001, Test Acc: 1.0000
+Epoch 18/20 — Train Loss: 0.0001, Train Acc: 1.0000 — Test Loss: 0.0004, Test Acc: 0.9995
+Epoch 19/20 — Train Loss: 0.0000, Train Acc: 1.0000 — Test Loss: 0.0000, Test Acc: 1.0000
+Epoch 20/20 — Train Loss: 0.0000, Train Acc: 1.0000 — Test Loss: 0.0006, Test Acc: 0.9995
+
+Training complete! Best accuracy: 1.0000

@@ -6,7 +6,9 @@ authors = ["Your Name <you@example.com>"]
 package-mode = false
 
 [tool.poetry.dependencies]
-python = ">=3.14, <3.15"
+python = ">=3.12, <3.15"
+
+setuptools = "*"
 
 # System monitor
 psutil = "*"
@@ -17,13 +19,25 @@ pillow = "*"
 # UI
 matplotlib = "*"
 
-# ONNX Inference (no torch needed)
 numpy = "*"
-onnxruntime-gpu = { version = "*", platform = "win32" }
-onnxruntime = { version = "*", platform = "darwin" }
 
-# --- MacOS Specific (Darwin) ---
-# These will only be installed if the OS is macOS
+# Data collection / upload
+requests = "*"
+yadisk = "*"
+python-dotenv = "*"
+
+[tool.poetry.group.inference]
+optional = true
+
+[tool.poetry.group.inference.dependencies]
+# ONNX Inference (no torch needed)
+onnxruntime-gpu = { version = "*", platform = "win32" }
+onnxruntime = { version = "*", markers = "sys_platform != 'win32'" }
+
+[tool.poetry.group.macos]
+optional = true
+
+[tool.poetry.group.macos.dependencies]
 pyobjc-core = {version = ">=12.1", platform = "darwin"}
 pyobjc-framework-Quartz = {version = ">=12.1", platform = "darwin"}
 pyobjc-framework-Cocoa = {version = ">=12.1", platform = "darwin"}

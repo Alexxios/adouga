@@ -1,6 +1,9 @@
 on:
   push:
     - workflows: [autotests]
+    - workflows: [build-dev-windows]
+      filter:
+        branches: ["main"]
 
 workflows:
   autotests:
@@ -25,20 +28,33 @@ workflows:
                   poetry run pytest desktop/tests/
                 fi
 
-  build:
-    runs_on: serverless # Experimental mode. For other options, see: https://sourcecraft.dev/portal/docs/ru/sourcecraft/ci-cd-ref/workflows
+  build-dev-windows:
     tasks:
-      - name: sample-task
+      - name: build-dev-installer
         cubes:
-          - name: sample-cube1
+          # 1. Export Poetry dependencies to requirements.txt
+          - name: prepare-requirements
             image: cr.yandex/mirror/library/python:3.14-slim
             script:
               - |
                 set -eo pipefail
-                apt-get -qq update
-                apt-get -qq install -y python3-dev gcc linux-headers-generic
-                python -m pip install --upgrade pip setuptools wheel
-                if [ -f pyproject.toml ]; then
-                  pip install poetry
-                  poetry install
-                fi
+                pip install poetry poetry-plugin-export
+                cd desktop
+                poetry export --without-hashes --without dev,inference,macos -f requirements.txt -o requirements.txt
+
+          # 2. Build Windows .exe via PyInstaller (Wine-based, cross-compiles on Linux)
+          - name: pyinstaller
+            action: JackMcKew/pyinstaller-action-windows@main
+            with:
+              path: desktop
+              spec: dev_main.spec
+            artifacts:
+              paths:
+                - ./desktop/dist
+                - ./dist
+
+          # 3. Build Windows installer with Inno Setup (Wine-based, runs on Linux)
+          - name: innosetup
+            image: amake/innosetup:innosetup6
+            script:
+              - iscc desktop/installer.iss

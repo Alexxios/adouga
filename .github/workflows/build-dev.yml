@@ -1,0 +1,39 @@
+name: Build Dev App
+
+on: [push]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    env:
+      PYNPUT_BACKEND: dummy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install poetry poetry-plugin-export
+          cd desktop
+          poetry export --without-hashes --without dev,inference,macos -f requirements.txt -o requirements.txt
+
+      - name: Create .env with token
+        run: echo "YADISK_TOKEN=${{ secrets.YADISK_TOKEN }}" > desktop/.env
+
+      - name: Build with PyInstaller
+        uses: sayyid5416/pyinstaller@v1
+        with:
+          spec: desktop/dev_main.spec
+          requirements: desktop/requirements.txt
+          python_ver: "3.12"
+          clean_checkout: false
+          upload_exe_with_name: AdougaDev

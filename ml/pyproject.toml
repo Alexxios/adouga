@@ -25,6 +25,11 @@ datasets = "^4.5.0"
 torch = "^2.9.1"
 torchvision = "^0.24.1"
 torchaudio = "^2.9.1"
+ultralytics = ">=8.3"
+
+# Data download
+yadisk = "*"
+python-dotenv = "*"
 
 # Inference
 onnx = "*"
@@ -38,6 +43,9 @@ pyobjc-core = {version = ">=12.1", platform = "darwin"}
 pyobjc-framework-AppleScriptKit = {version = ">=12.1", platform = "darwin"}
 pyobjc-framework-Quartz = {version = ">=12.1", platform = "darwin"}
 pyobjc-framework-Cocoa = {version = ">=12.1", platform = "darwin"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,0 +1,16 @@
+{
+  "name": "games_only_v1",
+  "trained": [
+    "data/zips/*_valorant.zip",
+    "data/zips/*_hearthstone.zip",
+    "data/zips/*_miro.zip"
+  ],
+  "similar": [
+    "data/zips/*_chrome.zip"
+  ],
+  "out_of_box": [
+    "data/zips/*_rocket_league.zip"
+  ],
+  "test_ratio": 0.2,
+  "seed": 42
+}
