@@ -33,6 +33,7 @@ jobs:
           requirements: desktop/requirements.txt
           python_ver: "3.12"
           clean_checkout: false
+          exe_path: desktop/dist
           upload_exe_with_name: Adouga
 
       - name: Build Inno Setup installer
